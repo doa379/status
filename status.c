@@ -122,17 +122,17 @@ char tmp[STRLEN];
 unsigned short interval = 1;
 bool quit;
 
-static void difftimespec(struct timespec *res, struct timespec *b, struct timespec *a)
+inline static void difftimespec(struct timespec *res, struct timespec *b, struct timespec *a)
 {
 	res->tv_sec = b->tv_sec - a->tv_sec - (b->tv_nsec < a->tv_nsec);
 	res->tv_nsec = b->tv_nsec - a->tv_nsec +
 	               (b->tv_nsec < a->tv_nsec) * 1000000000;
 }
 
-void read_file(const char *file, void *callback(), void *data)
+inline static void read_file(const char *file, void *callback(), void *data)
 {
 	FILE *fp;
-	static char line[STRLEN];
+	char line[STRLEN];
 
 	if (!(fp = fopen(file, "r")))
 	{
@@ -146,7 +146,7 @@ void read_file(const char *file, void *callback(), void *data)
 	fclose(fp);
 }
 
-void read_dir(const char *dir, void *callback(), void *data)
+inline static void read_dir(const char *dir, void *callback(), void *data)
 {
 	DIR *dp;
 	struct dirent *d;
@@ -163,56 +163,56 @@ void read_dir(const char *dir, void *callback(), void *data)
 	closedir(dp);
 }
 
-void date(void)
+inline static void date(void)
 {
 	time_t t = time(NULL);
 	strftime(tmp, sizeof(tmp), "%l:%M %a %d %b", localtime(&t));
 	sprintf(status, "%s%s%s", status, SEPERATOR, tmp);
 }
 
-void *callback_BAT_capacity(const char *string, void *data)
+inline static void *callback_BAT_capacity(const char *string, void *data)
 {
 	BAT *b = data;
 	b->capacity = strtod(string, NULL);
 	return NULL;
 }
 
-void *callback_BAT_capacity_level(const char *string, void *data)
+inline static void *callback_BAT_capacity_level(const char *string, void *data)
 {
 	BAT *b = data;
 	b->capacity_level = string[0];	
 	return NULL;
 }
 
-void *callback_BAT_charge_full(const char *string, void *data)
+inline static void *callback_BAT_charge_full(const char *string, void *data)
 {
 	BAT *b = data;
 	b->charge_full = strtol(string, NULL, 10);
 	return NULL;
 }
 
-void *callback_BAT_charge_now(const char *string, void *data)
+inline static void *callback_BAT_charge_now(const char *string, void *data)
 {
 	BAT *b = data;
 	b->charge_now = strtol(string, NULL, 10);
 	return NULL;
 }
 
-void *callback_BAT_status(const char *string, void *data)
+inline static void *callback_BAT_status(const char *string, void *data)
 {
 	BAT *b = data;
 	b->status = string[0];
 	return NULL;
 }
 
-void *callback_AC(const char *string, void *data)
+inline static void *callback_AC(const char *string, void *data)
 {
 	PS *ps = data;
 	ps->AC_online = strtod(string, NULL);
 	return NULL;
 }
 
-void *callback_ps(const char *unit_dev, void *data)
+inline static void *callback_ps(const char *unit_dev, void *data)
 {
 	PS *ps = data;
 	sprintf(tmp, "%s%s/", POWER_SUPPLIES, unit_dev);
@@ -251,13 +251,13 @@ void *callback_ps(const char *unit_dev, void *data)
 	return NULL;
 }
 
-void ps(void)
+inline static void ps(void)
 {
 	PS ps;
 	read_dir(POWER_SUPPLIES, callback_ps, &ps);
 }
 
-void str_append(char *string, const char *sym, float numeric)
+inline static void str_append(char *string, const char *sym, float numeric)
 {
 	/* Function expects numeric to be in kB units */
 	if (numeric * kB < kB)
@@ -273,7 +273,7 @@ void str_append(char *string, const char *sym, float numeric)
 		sprintf(string, "%s %s%.2fG", string, sym, numeric / mB);
 }
 
-const char *tail(const char *file, unsigned char n)
+inline static const char *tail(const char *file, unsigned char n)
 {
 	FILE *fp;
 	static char line[STRLEN];
@@ -308,7 +308,7 @@ void *callback_idempotent(const char *line, void *data)
 	return NULL;
 }
 
-void public_ip(IP *ip)
+inline static void public_ip(IP *ip)
 {
 	char prev_ip[SIZE];
 	unsigned int d[4];
@@ -341,7 +341,7 @@ void public_ip(IP *ip)
 		sprintf(status, "%s%s%s%s%s", status, SEPERATOR, prev_ip, RIGHT_ARROW, ip->buffer);
 }
 
-void *callback_net(const char *line, void *data)
+inline static void *callback_net(const char *line, void *data)
 {
 	Net *ns = data, tmp;
 
@@ -363,7 +363,7 @@ void *callback_net(const char *line, void *data)
 	return NULL;
 }
 
-void *callback_wireless(const char *line, void *data)
+inline static void *callback_wireless(const char *line, void *data)
 {
 	Wireless *w = data, tmp;	
 	sscanf(line, "%s %*[^ ] %d", tmp.if_name, &tmp.link);
@@ -379,7 +379,7 @@ void *callback_wireless(const char *line, void *data)
 	return NULL;
 }
 
-static void net(Net *ns)
+inline static void net(Net *ns)
 {
 	register unsigned char i, N = LENGTH(net_if);
 	Wireless w[N];
@@ -404,7 +404,7 @@ static void net(Net *ns)
 	}
 }
 
-void du(void)
+inline static void du(void)
 {
 	struct statvfs fs;
 	register unsigned char i, N = LENGTH(dir), perc;
@@ -422,7 +422,7 @@ void du(void)
  	}
 }
 
-void *callback_io(const char *line, void *data)
+inline static void *callback_io(const char *line, void *data)
 {
 	Diskstats *ds = data, tmp;
 	sscanf(line, " %*[^ ] %*[^ ] %s %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ]",
@@ -441,7 +441,7 @@ void *callback_io(const char *line, void *data)
 	return NULL;
 }
 
-static void io(Diskstats *ds)
+inline static void io(Diskstats *ds)
 {
 	register unsigned char i, N = LENGTH(disk);
 	sprintf(status, "%s%s", status, SEPERATOR);
@@ -457,7 +457,7 @@ static void io(Diskstats *ds)
 	}
 }
 
-void *callback_mem(const char *line, void *data)
+inline static void *callback_mem(const char *line, void *data)
 {
 	Mem *m = data;
 	
@@ -473,7 +473,7 @@ void *callback_mem(const char *line, void *data)
 	return NULL;
 }
 
-void mem(void)
+inline static void mem(void)
 {
 	Mem m;
 	read_file(RAM, callback_mem, &m);
@@ -483,7 +483,7 @@ void mem(void)
 	str_append(status, "\0", swap);
 }
 
-void *callback_cpu(const char *line, void *data)
+inline static void *callback_cpu(const char *line, void *data)
 {
 	Cpu *c = data, tmp;
 
@@ -520,14 +520,14 @@ void *callback_cpu(const char *line, void *data)
 	return NULL;
 }
 
-void cpu(Cpu *c)
+inline static void cpu(Cpu *c)
 {
 	read_file(CPU, callback_cpu, c);
 	read_file(STAT, callback_cpu, c);
 	sprintf(status, "%.0f%% %.0fMHz", c->perc, c->mhz);
 }
 
-size_t writefunc(void *ptr, size_t size, size_t nmemb, void *data)
+inline static size_t writefunc(void *ptr, size_t size, size_t nmemb, void *data)
 {
 	IP *ip = data;
   	
@@ -539,7 +539,7 @@ size_t writefunc(void *ptr, size_t size, size_t nmemb, void *data)
 	return size * nmemb;
 }
 
-void init_curl(IP *ip)
+static void init_curl(IP *ip)
 {
 	curl_global_init(CURL_GLOBAL_ALL);
 	ip->handle = curl_easy_init();
