@@ -12,34 +12,34 @@
 #include <curl/curl.h>
 #include "config.h"
 
-#define LENGTH(X)			(sizeof X / sizeof X[0])
-#define SIZE				64
+#define LENGTH(X)								(sizeof X / sizeof X[0])
+#define SIZE										64
 
-#define POWER_SUPPLIES		"/sys/class/power_supply/"
-#define CPU					"/proc/cpuinfo"
-#define RAM					"/proc/meminfo"
-#define STAT				"/proc/stat"
-#define DISKSTAT			"/proc/diskstats"
-#define NET_ADAPTERS		"/proc/net/dev"
-#define WIRELESS			"/proc/net/wireless"
+#define POWER_SUPPLIES					"/sys/class/power_supply/"
+#define CPU											"/proc/cpuinfo"
+#define RAM											"/proc/meminfo"
+#define STAT										"/proc/stat"
+#define DISKSTAT								"/proc/diskstats"
+#define NET_ADAPTERS						"/proc/net/dev"
+#define WIRELESS								"/proc/net/wireless"
 
-#define kB					1024
-#define mB					(kB * kB)
-#define gB					(kB * mB)
+#define kB											1024
+#define mB											(kB * kB)
+#define gB											(kB * mB)
 
-#define UP_ARROW			"\u2b06"
-#define DOWN_ARROW			"\u2b07"
-#define RIGHT_ARROW			"\u27a1"
-#define FULL_SPACE			"\u2000"
-#define SHORT_SPACE			"\u2005"
-#define HEAVY_HORIZONTAL	"\u2501"
-#define HEAVY_VERTICAL		"\u2503"
-#define DOUBLE_VERTICAL		"\u2551"
+#define UP_ARROW								"\u2b06"
+#define DOWN_ARROW							"\u2b07"
+#define RIGHT_ARROW							"\u27a1"
+#define FULL_SPACE							"\u2000"
+#define SHORT_SPACE							"\u2005"
+#define HEAVY_HORIZONTAL				"\u2501"
+#define HEAVY_VERTICAL					"\u2503"
+#define DOUBLE_VERTICAL					"\u2551"
 #define LF_THREE_EIGHTHS_BLOCK	" \u258d"
-#define LIGHT_SHADE			"\u2591"
-#define MEDIUM_SHADE		" \u2592 "
-#define DARK_SHADE			" \u2593 "
-#define SEPERATOR			LF_THREE_EIGHTHS_BLOCK
+#define LIGHT_SHADE							"\u2591"
+#define MEDIUM_SHADE						" \u2592 "
+#define DARK_SHADE							" \u2593 "
+#define SEPERATOR								LF_THREE_EIGHTHS_BLOCK
 
 typedef struct
 {
