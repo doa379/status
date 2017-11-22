@@ -7,40 +7,39 @@
 #include <time.h>
 #include <X11/Xlib.h>
 #include <string.h>
-#include <time.h>
 #include <dirent.h>
 #include <sys/statvfs.h>
 #include <curl/curl.h>
 #include "config.h"
 
-#define LENGTH(X)		(sizeof X / sizeof X[0])
-#define SIZE			64
+#define LENGTH(X)			(sizeof X / sizeof X[0])
+#define SIZE				64
 
 #define POWER_SUPPLIES		"/sys/class/power_supply/"
-#define CPU			"/proc/cpuinfo"
-#define RAM			"/proc/meminfo"
-#define STAT			"/proc/stat"
-#define DISKSTAT		"/proc/diskstats"
+#define CPU					"/proc/cpuinfo"
+#define RAM					"/proc/meminfo"
+#define STAT				"/proc/stat"
+#define DISKSTAT			"/proc/diskstats"
 #define NET_ADAPTERS		"/proc/net/dev"
-#define WIRELESS		"/proc/net/wireless"
+#define WIRELESS			"/proc/net/wireless"
 
-#define kB			1024
-#define mB			(kB * kB)
-#define gB			(kB * mB)
+#define kB					1024
+#define mB					(kB * kB)
+#define gB					(kB * mB)
 
-#define UP_ARROW		"\u2b06"
-#define DOWN_ARROW		"\u2b07"
-#define RIGHT_ARROW		"\u27a1"
-#define FULL_SPACE		"\u2000"
-#define SHORT_SPACE		"\u2005"
+#define UP_ARROW			"\u2b06"
+#define DOWN_ARROW			"\u2b07"
+#define RIGHT_ARROW			"\u27a1"
+#define FULL_SPACE			"\u2000"
+#define SHORT_SPACE			"\u2005"
 #define HEAVY_HORIZONTAL	"\u2501"
 #define HEAVY_VERTICAL		"\u2503"
 #define DOUBLE_VERTICAL		"\u2551"
 #define LF_THREE_EIGHTHS_BLOCK	" \u258d"
-#define LIGHT_SHADE		"\u2591"
+#define LIGHT_SHADE			"\u2591"
 #define MEDIUM_SHADE		" \u2592 "
-#define DARK_SHADE		" \u2593 "
-#define SEPERATOR		LF_THREE_EIGHTHS_BLOCK
+#define DARK_SHADE			" \u2593 "
+#define SEPERATOR			LF_THREE_EIGHTHS_BLOCK
 
 typedef struct
 {
@@ -125,8 +124,7 @@ bool quit;
 inline static void difftimespec(struct timespec *res, struct timespec *b, struct timespec *a)
 {
 	res->tv_sec = b->tv_sec - a->tv_sec - (b->tv_nsec < a->tv_nsec);
-	res->tv_nsec = b->tv_nsec - a->tv_nsec +
-	               (b->tv_nsec < a->tv_nsec) * 1000000000;
+	res->tv_nsec = b->tv_nsec - a->tv_nsec + (b->tv_nsec < a->tv_nsec);
 }
 
 inline static void read_file(const char *file, void *callback(), void *data)
@@ -142,7 +140,7 @@ inline static void read_file(const char *file, void *callback(), void *data)
 
 	while (fgets(line, sizeof line, fp))
 		callback(line, data);
-	
+
 	fclose(fp);
 }
 
@@ -180,7 +178,7 @@ inline static void *callback_BAT_capacity(const char *string, void *data)
 inline static void *callback_BAT_capacity_level(const char *string, void *data)
 {
 	BAT *b = data;
-	b->capacity_level = string[0];	
+	b->capacity_level = string[0];
 	return NULL;
 }
 
@@ -221,7 +219,7 @@ inline static void *callback_ps(const char *unit_dev, void *data)
 	{
 		strcat(tmp, "online");
 		read_file(tmp, callback_AC, ps);
-		
+
 		if (ps->AC_online)
 			interval = UPDATE_INTV * 1000;
 
@@ -241,7 +239,7 @@ inline static void *callback_ps(const char *unit_dev, void *data)
 		read_file(battery_prop, callback_BAT_charge_now, &ps->b);
 		sprintf(battery_prop, "%s%s", tmp, "status");
 		read_file(battery_prop, callback_BAT_status, &ps->b);
-	
+
 		if (ps->b.status == 'F')
 			sprintf(status, "%s%s%c", status, SEPERATOR, ps->b.status);
 
@@ -270,7 +268,7 @@ inline static void str_append(char *string, const char *sym, float numeric)
 		sprintf(string, "%s %s%.1fM", string, sym, numeric / kB);
 
 	else if (numeric * kB >= gB)
-		sprintf(string, "%s %s%.2fG", string, sym, numeric / mB);
+		sprintf(string, "%s %s%.1fG", string, sym, numeric / mB);
 }
 
 inline static const char *tail(const char *file, unsigned char n)
@@ -279,7 +277,7 @@ inline static const char *tail(const char *file, unsigned char n)
 	static char line[STRLEN];
 	unsigned char i = 1;
 	signed char err;
-	
+
 	if (!(fp = fopen(file, "a+")))
 	{
 		fprintf(stderr, "Unable to open file\n");
@@ -312,11 +310,10 @@ inline static void public_ip(IP *ip)
 {
 	char prev_ip[SIZE];
 	unsigned int d[4];
+	CURLcode result = curl_easy_perform(ip->handle);
 
-	if (curl_easy_perform(ip->handle) != CURLE_OK)
-		return;
-
-	if(sscanf(ip->buffer, "%3d.%3d.%3d.%3d", &d[0], &d[1], &d[2], &d[3]) != 4)
+	if (result != CURLE_OK ||
+		sscanf(ip->buffer, "%3d.%3d.%3d.%3d", &d[0], &d[1], &d[2], &d[3]) != 4)
 		return;
 
 	strcpy(prev_ip, tail(iplist, 2));
@@ -330,7 +327,7 @@ inline static void public_ip(IP *ip)
 
 		fprintf(fp, "%s\n", ip->buffer);
 		fclose(fp);
-	}		
+	}
 
 	else strcpy(prev_ip, tail(iplist, 3));
 
@@ -345,7 +342,7 @@ inline static void *callback_net(const char *line, void *data)
 {
 	Net *ns = data, tmp;
 
-	sscanf(line, "%s %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ]",	
+	sscanf(line, "%s %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ]",
 		tmp.if_name,
 		&tmp.RX_bytes,
 		&tmp.TX_bytes);
@@ -365,7 +362,7 @@ inline static void *callback_net(const char *line, void *data)
 
 inline static void *callback_wireless(const char *line, void *data)
 {
-	Wireless *w = data, tmp;	
+	Wireless *w = data, tmp;
 	sscanf(line, "%s %*[^ ] %d", tmp.if_name, &tmp.link);
 
 	if (strncmp(tmp.if_name, w->ns->net_if, strlen(w->ns->net_if)) == 0)
@@ -383,7 +380,7 @@ inline static void net(Net *ns)
 {
 	register unsigned char i, N = LENGTH(net_if);
 	Wireless w[N];
-	
+
 	for (i = 0; i < N; i++)
 	{
 		ns[i].net_if = net_if[i];
@@ -393,10 +390,10 @@ inline static void net(Net *ns)
 
 		if (strcmp(ns[i].net_if, w[i].if_name) == 0 && w[i].link)
 			sprintf(status, "%s%s%s %.0f%%", status, SEPERATOR, ns[i].net_if, (w[i].link / 70.) * 100);
-	
+
 		else
 			sprintf(status, "%s%s%s", status, SEPERATOR, ns[i].net_if);
-		
+
 		str_append(status, UP_ARROW, ns[i].up_kbytes);
 		str_append(status, "", ns[i].TX_bytes);
 		str_append(status, DOWN_ARROW, ns[i].down_kbytes);
@@ -416,7 +413,7 @@ inline static void du(void)
 			printf("Unable to get fs info\n");
 			continue;
 		}
-		
+
 		perc = (1 - ((float) fs.f_bfree / (float) fs.f_blocks)) * 100;
 		sprintf(status, "%s %s %u%%", status, dir[i], perc);
  	}
@@ -435,7 +432,7 @@ inline static void *callback_io(const char *line, void *data)
 		ds->read_kBs = (tmp.rd_sec_or_wr_ios - ds->rd_sec_or_wr_ios) / 2.;
 		ds->write_kBs = (tmp.wr_sec - ds->wr_sec) / 2.;
 		ds->rd_sec_or_wr_ios =  tmp.rd_sec_or_wr_ios;
-		ds->wr_sec = tmp.wr_sec; 
+		ds->wr_sec = tmp.wr_sec;
 	}
 
 	return NULL;
@@ -460,7 +457,7 @@ inline static void io(Diskstats *ds)
 inline static void *callback_mem(const char *line, void *data)
 {
 	Mem *m = data;
-	
+
 	sscanf(line, "MemTotal: %lu", &m->MemTotal);
 	sscanf(line, "MemFree: %lu", &m->MemFree);
 	sscanf(line, "MemAvailable: %lu", &m->MemAvailable);
@@ -469,7 +466,7 @@ inline static void *callback_mem(const char *line, void *data)
 	sscanf(line, "SwapCached: %lu", &m->SwapCached);
 	sscanf(line, "SwapTotal: %lu", &m->SwapTotal);
 	sscanf(line, "SwapFree: %lu", &m->SwapFree);
-	
+
 	return NULL;
 }
 
@@ -500,7 +497,7 @@ inline static void *callback_cpu(const char *line, void *data)
 			- c->user - c->nice - c->system - c->irq - c->softirq) /
 			 (double) (tmp.user + tmp.nice + tmp.system + tmp.idle + tmp.iowait + tmp.irq + tmp.softirq
 			- c->user - c->nice - c->system - c->idle - c->iowait - c->irq - c->softirq) * 100.;
-	
+
 		c->user = tmp.user;
 		c->nice = tmp.nice;
 		c->system = tmp.system;
@@ -516,7 +513,7 @@ inline static void *callback_cpu(const char *line, void *data)
 	else if (sscanf(line, "cpu MHz : %f", &tmp.mhz) == 1)
 		/* Calculate the rolling average wrt to number of cores */
 		c->mhz = (c->mhz * (c->processor) + tmp.mhz) / (c->processor + 1);
-	
+
 	return NULL;
 }
 
@@ -530,16 +527,25 @@ inline static void cpu(Cpu *c)
 inline static size_t writefunc(void *ptr, size_t size, size_t nmemb, void *data)
 {
 	IP *ip = data;
-  	
-	if (size * nmemb < sizeof ip->buffer)
-		memcpy(ip->buffer, ptr, size * nmemb);
+	size_t S = size * nmemb;
+
+	if (S < sizeof ip->buffer)
+	{
+		memcpy(ip->buffer, ptr, S);
+		ip->buffer[S] = '\0';
+	}
 
 	else ip->buffer[0] = '\0';
 
-	return size * nmemb;
+	return S;
 }
 
-static void init_curl(IP *ip)
+void deinit_curl(IP *ip)
+{
+	curl_easy_cleanup(ip->handle);
+}
+
+void init_curl(IP *ip)
 {
 	curl_global_init(CURL_GLOBAL_ALL);
 	ip->handle = curl_easy_init();
@@ -549,7 +555,7 @@ static void init_curl(IP *ip)
 	curl_easy_setopt(ip->handle, CURLOPT_TIMEOUT, 1L);
 }
 
-static void set_quit_flag(const int signo)
+void set_quit_flag(const int signo)
 {
 	(void) signo;
 	quit = 1;
@@ -568,7 +574,7 @@ int main(int argc, char **argv)
 	sigaction(SIGTERM, &SA, NULL);
 	setlocale(LC_ALL, "");
 	Display *dpy;
-	
+
 	if (!(dpy = XOpenDisplay(NULL)))
 	{
 		fprintf(stderr, "Cannot open display\n");
@@ -606,7 +612,7 @@ int main(int argc, char **argv)
 		// Wait
 		clock_gettime(CLOCK_MONOTONIC, &current);
 		difftimespec(&diff, &current, &start);
-		intspec.tv_sec = interval / 1000;
+		intspec.tv_sec = interval;
 		intspec.tv_nsec = (interval % 1000) * 1000000;
 		difftimespec(&wait, &intspec, &diff);
 
@@ -614,9 +620,8 @@ int main(int argc, char **argv)
 			nanosleep(&wait, NULL);
 	}
 
-	curl_easy_cleanup(ip.handle);
+	deinit_curl(&ip);
 	XStoreName(dpy, DefaultRootWindow(dpy), NULL);
 	XCloseDisplay(dpy);
 	return 0;
 }
-
