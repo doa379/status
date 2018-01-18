@@ -118,7 +118,7 @@ typedef struct
 
 char status[STRLEN];
 char tmp[STRLEN];
-unsigned short interval = 1;
+unsigned short interval;
 bool quit;
 
 inline static void difftimespec(struct timespec *res, struct timespec *b, struct timespec *a)
@@ -221,9 +221,9 @@ inline static void *callback_ps(const char *unit_dev, void *data)
 		read_file(tmp, callback_AC, ps);
 
 		if (ps->AC_online)
-			interval = UPDATE_INTV * 1000;
+			interval = UPDATE_INTV;
 
-		else interval = UPDATE_INTV_ON_BATTERY * 1000;
+		else interval = UPDATE_INTV_ON_BATTERY;
 	}
 
 	else if (!strncmp(unit_dev, "BAT", 3 * sizeof(char)))
@@ -531,6 +531,7 @@ inline static size_t writefunc(void *ptr, size_t size, size_t nmemb, void *data)
 
 	if (S < sizeof ip->buffer)
 	{
+		memset(ip->buffer, 0, S);
 		memcpy(ip->buffer, ptr, S);
 		ip->buffer[S] = '\0';
 	}
@@ -613,7 +614,7 @@ int main(int argc, char **argv)
 		clock_gettime(CLOCK_MONOTONIC, &current);
 		difftimespec(&diff, &current, &start);
 		intspec.tv_sec = interval;
-		intspec.tv_nsec = (interval % 1000) * 1000000;
+		intspec.tv_nsec = (interval % 1000) * 1000;
 		difftimespec(&wait, &intspec, &diff);
 
 		if (wait.tv_sec >= 0)
