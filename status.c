@@ -220,8 +220,6 @@ inline static void *callback_ps(const char *unit_dev, void *data)
 
 		if (ps->AC_online)
 			interval = UPDATE_INTV;
-
-		else interval = UPDATE_INTV_ON_BATTERY;
 	}
 
 	else if (!strncmp(unit_dev, "BAT", 3 * sizeof(char)))
@@ -242,6 +240,8 @@ inline static void *callback_ps(const char *unit_dev, void *data)
 			sprintf(status, "%s%s%c", status, SEPERATOR, ps->b.status);
 
 		else sprintf(status, "%s%s%c %u%%", status, SEPERATOR, ps->b.status, ps->b.capacity);
+
+		interval = UPDATE_INTV_ON_BATTERY;
 	}
 
 	return NULL;
