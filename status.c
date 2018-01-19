@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include <time.h>
 #include <X11/Xlib.h>
 #include <string.h>
 #include <dirent.h>
@@ -12,34 +11,34 @@
 #include <curl/curl.h>
 #include "config.h"
 
-#define LENGTH(X)								(sizeof X / sizeof X[0])
-#define SIZE										64
+#define LENGTH(X)		(sizeof X / sizeof X[0])
+#define SIZE			64
 
-#define POWER_SUPPLIES					"/sys/class/power_supply/"
-#define CPU											"/proc/cpuinfo"
-#define RAM											"/proc/meminfo"
-#define STAT										"/proc/stat"
-#define DISKSTAT								"/proc/diskstats"
-#define NET_ADAPTERS						"/proc/net/dev"
-#define WIRELESS								"/proc/net/wireless"
+#define POWER_SUPPLIES		"/sys/class/power_supply/"
+#define CPU			"/proc/cpuinfo"
+#define RAM			"/proc/meminfo"
+#define STAT			"/proc/stat"
+#define DISKSTAT		"/proc/diskstats"
+#define NET_ADAPTERS		"/proc/net/dev"
+#define WIRELESS		"/proc/net/wireless"
 
-#define kB											1024
-#define mB											(kB * kB)
-#define gB											(kB * mB)
+#define kB			1024
+#define mB			(kB * kB)
+#define gB			(kB * mB)
 
-#define UP_ARROW								"\u2b06"
-#define DOWN_ARROW							"\u2b07"
-#define RIGHT_ARROW							"\u27a1"
-#define FULL_SPACE							"\u2000"
-#define SHORT_SPACE							"\u2005"
-#define HEAVY_HORIZONTAL				"\u2501"
-#define HEAVY_VERTICAL					"\u2503"
-#define DOUBLE_VERTICAL					"\u2551"
+#define UP_ARROW		"\u2b06"
+#define DOWN_ARROW		"\u2b07"
+#define RIGHT_ARROW		"\u27a1"
+#define FULL_SPACE		"\u2000"
+#define SHORT_SPACE		"\u2005"
+#define HEAVY_HORIZONTAL	"\u2501"
+#define HEAVY_VERTICAL		"\u2503"
+#define DOUBLE_VERTICAL		"\u2551"
 #define LF_THREE_EIGHTHS_BLOCK	" \u258d"
-#define LIGHT_SHADE							"\u2591"
-#define MEDIUM_SHADE						" \u2592 "
-#define DARK_SHADE							" \u2593 "
-#define SEPERATOR								LF_THREE_EIGHTHS_BLOCK
+#define LIGHT_SHADE		"\u2591"
+#define MEDIUM_SHADE		" \u2592 "
+#define DARK_SHADE		" \u2593 "
+#define SEPERATOR		LF_THREE_EIGHTHS_BLOCK
 
 typedef struct
 {
@@ -118,14 +117,13 @@ typedef struct
 
 char status[STRLEN];
 char tmp[STRLEN];
-unsigned short interval;
+unsigned short interval = UPDATE_INTV;
 bool quit;
 
-inline static void difftimespec(struct timespec *res, struct timespec *b, struct timespec *a)
-{
-	res->tv_sec = b->tv_sec - a->tv_sec - (b->tv_nsec < a->tv_nsec);
-	res->tv_nsec = b->tv_nsec - a->tv_nsec + (b->tv_nsec < a->tv_nsec);
-}
+Cpu c;
+Diskstats ds[LENGTH(disk)];
+Net ns[LENGTH(net_if)];
+IP ip;
 
 inline static void read_file(const char *file, void *callback(), void *data)
 {
@@ -511,7 +509,7 @@ inline static void *callback_cpu(const char *line, void *data)
 		c->processor = tmp.processor;
 
 	else if (sscanf(line, "cpu MHz : %f", &tmp.mhz) == 1)
-		/* Calculate the rolling average wrt to number of cores */
+		/* Calculate the rolling average wrt number of cores */
 		c->mhz = (c->mhz * (c->processor) + tmp.mhz) / (c->processor + 1);
 
 	return NULL;
@@ -567,7 +565,7 @@ int main(int argc, char **argv)
 	(void) argc;
 	(void) **argv;
 
-	struct timespec start, current, diff, intspec, wait;
+	struct timeval tv;
 	struct sigaction SA;
 	memset(&SA, 0, sizeof SA);
 	SA.sa_handler = set_quit_flag;
@@ -582,17 +580,10 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	Cpu c;
-	Diskstats ds[LENGTH(disk)];
-	Net ns[LENGTH(net_if)];
-	IP ip;
 	init_curl(&ip);
 
 	while (!quit)
 	{
-		clock_gettime(CLOCK_MONOTONIC, &start);
-		status[0] = '\0';
-
 		// Getter Functions
 		cpu(&c);
 		mem();
@@ -606,19 +597,14 @@ int main(int argc, char **argv)
 		// Hack to space the string from the tray
 		strcat(status, FULL_SPACE);
 
-		// Update the root display with the string status
+		// Update the root display with the status string
 		XStoreName(dpy, DefaultRootWindow(dpy), status);
 		XSync(dpy, False);
 
 		// Wait
-		clock_gettime(CLOCK_MONOTONIC, &current);
-		difftimespec(&diff, &current, &start);
-		intspec.tv_sec = interval;
-		intspec.tv_nsec = (interval % 1000) * 1000;
-		difftimespec(&wait, &intspec, &diff);
-
-		if (wait.tv_sec >= 0)
-			nanosleep(&wait, NULL);
+		tv.tv_sec = interval;
+		tv.tv_usec = 0;
+		select(0, NULL, NULL, NULL, &tv);
 	}
 
 	deinit_curl(&ip);
