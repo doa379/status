@@ -349,8 +349,8 @@ inline static void *callback_net(const char *line, void *data)
 	{
 		tmp.RX_bytes /= kB;
 		tmp.TX_bytes /= kB;
-		ns->down_kbytes = (tmp.RX_bytes - ns->RX_bytes);
-		ns->up_kbytes = (tmp.TX_bytes - ns->TX_bytes);
+		ns->down_kbytes = (tmp.RX_bytes - ns->RX_bytes) / interval;
+		ns->up_kbytes = (tmp.TX_bytes - ns->TX_bytes) / interval;
 		ns->RX_bytes = tmp.RX_bytes;
 		ns->TX_bytes = tmp.TX_bytes;
 	}
@@ -427,8 +427,8 @@ inline static void *callback_io(const char *line, void *data)
 
 	if (strcmp(tmp.dev_name, ds->disk) == 0)
 	{
-		ds->read_kBs = (tmp.rd_sec_or_wr_ios - ds->rd_sec_or_wr_ios) / 2.;
-		ds->write_kBs = (tmp.wr_sec - ds->wr_sec) / 2.;
+		ds->read_kBs = (tmp.rd_sec_or_wr_ios - ds->rd_sec_or_wr_ios) / 2. / interval;
+		ds->write_kBs = (tmp.wr_sec - ds->wr_sec) / 2. / interval;
 		ds->rd_sec_or_wr_ios =  tmp.rd_sec_or_wr_ios;
 		ds->wr_sec = tmp.wr_sec;
 	}
