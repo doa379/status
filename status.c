@@ -4,30 +4,31 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include <X11/Xlib.h>
 #include <string.h>
 #include <dirent.h>
 #include <sys/statvfs.h>
+#include <sys/ioctl.h>
+#include <linux/wireless.h>
 #include <curl/curl.h>
 #include "config.h"
 
 #define LENGTH(X)		(sizeof X / sizeof X[0])
-#define SIZE			64
-
-#define POWER_SUPPLIES		"/sys/class/power_supply/"
-#define CPU			"/proc/cpuinfo"
-#define RAM			"/proc/meminfo"
-#define STAT			"/proc/stat"
-#define DISKSTAT		"/proc/diskstats"
-#define NET_ADAPTERS		"/proc/net/dev"
-#define WIRELESS		"/proc/net/wireless"
-
+#define CPU	"/proc/cpuinfo"
+#define MEM	"/proc/meminfo"
+#define STAT "/proc/stat"
+#define DISKSTAT "/proc/diskstats"
+#define NET_ADAPTERS "/proc/net/dev"
+#define WIRELESS "/proc/net/wireless"
+#define ACPI_ACSTATE "/proc/acpi/ac_adapter/AC/state"
+#define ACPI_BAT "/proc/acpi/battery"
+#define SND_CMD "fuser -v /dev/snd/* 2>&1 /dev/zero"
 #define kB			1024
 #define mB			(kB * kB)
 #define gB			(kB * mB)
-
 #define UP_ARROW		"\u2b06"
 #define DOWN_ARROW		"\u2b07"
+#define UP_TRI          "\u25b4"
+#define DOWN_TRI        "\u25be"
 #define RIGHT_ARROW		"\u27a1"
 #define FULL_SPACE		"\u2000"
 #define SHORT_SPACE		"\u2005"
@@ -38,248 +39,230 @@
 #define LIGHT_SHADE		"\u2591"
 #define MEDIUM_SHADE		" \u2592 "
 #define DARK_SHADE		" \u2593 "
-#define SEPERATOR		LF_THREE_EIGHTHS_BLOCK
+#define DASH_VERT       "\u250a"
+#define UP              UP_TRI
+#define DOWN            DOWN_TRI
+#define SEPERATOR		"|"
 
 typedef struct
 {
-	unsigned long user;
-	unsigned long nice;
-	unsigned long system;
-	unsigned long idle;
-	unsigned long iowait;
-	unsigned long irq;
-	unsigned long softirq;
+	unsigned long user,
+                nice,
+                system,
+                idle,
+                iowait,
+                irq,
+                softirq;
 	double perc;
-	unsigned int processor;
+	unsigned processor;
 	float mhz;
-} Cpu;
+} cpu_t;
 
 typedef struct
 {
-	unsigned long MemTotal;
-	unsigned long MemFree;
-	unsigned long MemAvailable;
-	unsigned long Buffers;
-	unsigned long Cached;
-	unsigned long SwapCached;
-	unsigned long SwapTotal;
-	unsigned long SwapFree;
-} Mem;
+	unsigned long total,
+                free,
+                available,
+                buffers,
+                cached,
+                swapcached,
+                swaptotal,
+                swapfree;
+  float perc, swap;
+} mem_t;
 
 typedef struct
 {
-	char dev_name[SIZE];
-	unsigned long rd_sec_or_wr_ios;
-	unsigned long wr_sec;
-	const char *disk;
-	double read_kBs;
-	double write_kBs;
-} Diskstats;
+	char DEVNAME[16];
+	unsigned long rd_sec_or_wr_ios, wr_sec;
+	const char *blkdev;
+	float readkbs, writekbs;
+} diskstats_t;
 
 typedef struct
 {
-	char if_name[SIZE];
-	unsigned long RX_bytes;
-	unsigned long TX_bytes;
-	const char *net_if;
-	float down_kbytes;
-	float up_kbytes;
-} Net;
+	char IFNAME[8];
+	unsigned long RXbytes, TXbytes;
+	const char *netif;
+	float downkbytes, upkbytes;
+} net_t;
 
 typedef struct
 {
-	char if_name[SIZE];
+	char IFNAME[8], ESSID[32];
 	unsigned int link;
-	Net *ns;
-	char essid[SIZE];
-} Wireless;
+	net_t *net;
+} wireless_t;
 
 typedef struct
 {
 	CURL *handle;
-	char buffer[SIZE];
-} IP;
+	char BUFFER[64], PREV[64];
+} ip_t;
 
 typedef struct
 {
-	unsigned char capacity;
-	char capacity_level;
-	unsigned long charge_full;
-	unsigned long charge_now;
-	char status;
-} BAT;
+	unsigned capacity,
+           remaining,
+           rate;
+	char BAT[8], STATE[16], STATEFILE[32];
+  float perc;
+} battery_t;
 
 typedef struct
 {
-	bool AC_online;
-	BAT b;
-} PS;
+  unsigned NBAT;
+  battery_t BATTERY[MAX_BATTERIES];
+} batteries_t;
 
-char status[STRLEN];
-char tmp[STRLEN];
-unsigned short interval = UPDATE_INTV;
-bool quit;
+static unsigned char interval = UPDATE_INTV;
+static bool quit = 0;
 
-Cpu c;
-Diskstats ds[LENGTH(disk)];
-Net ns[LENGTH(net_if)];
-IP ip;
-
-inline static void read_file(const char *file, void *callback(), void *data)
+static void read_file(void *data, void (*cb)(), const char FILENAME[])
 {
-	FILE *fp;
-	char line[STRLEN];
+	static FILE *fp;
+	static char LINE[STRLEN];
 
-	if (!(fp = fopen(file, "r")))
+	if (!(fp = fopen(FILENAME, "r")))
 	{
-		fprintf(stderr, "Unable to open file\n");
+		fprintf(stderr, "Unable to open file %s\n", FILENAME);
 		return;
 	}
 
-	while (fgets(line, sizeof line, fp))
-		callback(line, data);
+	while (fgets(LINE, sizeof LINE, fp))
+		cb(data, LINE);
 
 	fclose(fp);
 }
 
-inline static void read_dir(const char *dir, void *callback(), void *data)
+static void read_dir(void *data, void (*cb)(), const char DIRNAME[])
 {
-	DIR *dp;
-	struct dirent *d;
+	static DIR *dp;
+	static struct dirent *d;
 
-	if (!(dp = opendir(dir)))
+	if (!(dp = opendir(DIRNAME)))
 	{
-		fprintf(stderr, "Unable to open dir\n");
+		fprintf(stderr, "Unable to open dir %s\n", DIRNAME);
 		return;
 	}
 
 	while ((d = readdir(dp)))
-		callback(d->d_name, data);
+    if (strcmp(d->d_name, ".") && strcmp(d->d_name, ".."))
+		  cb(data, d->d_name);
 
 	closedir(dp);
 }
 
-inline static void date(void)
-{
-	time_t t = time(NULL);
-	strftime(tmp, sizeof(tmp), "%l:%M %a %d %b", localtime(&t));
-	sprintf(status, "%s%s%s", status, SEPERATOR, tmp);
-}
-
-inline static void *callback_BAT_capacity(const char *string, void *data)
-{
-	BAT *b = data;
-	b->capacity = strtod(string, NULL);
-	return NULL;
-}
-
-inline static void *callback_BAT_capacity_level(const char *string, void *data)
-{
-	BAT *b = data;
-	b->capacity_level = string[0];
-	return NULL;
-}
-
-inline static void *callback_BAT_charge_full(const char *string, void *data)
-{
-	BAT *b = data;
-	b->charge_full = strtol(string, NULL, 10);
-	return NULL;
-}
-
-inline static void *callback_BAT_charge_now(const char *string, void *data)
-{
-	BAT *b = data;
-	b->charge_now = strtol(string, NULL, 10);
-	return NULL;
-}
-
-inline static void *callback_BAT_status(const char *string, void *data)
-{
-	BAT *b = data;
-	b->status = string[0];
-	return NULL;
-}
-
-inline static void *callback_AC(const char *string, void *data)
-{
-	PS *ps = data;
-	ps->AC_online = strtod(string, NULL);
-	return NULL;
-}
-
-inline static void *callback_ps(const char *unit_dev, void *data)
-{
-	PS *ps = data;
-	sprintf(tmp, "%s%s/", POWER_SUPPLIES, unit_dev);
-
-	if (!strcmp(unit_dev, "AC"))
-	{
-		strcat(tmp, "online");
-		read_file(tmp, callback_AC, ps);
-
-		if (ps->AC_online)
-			interval = UPDATE_INTV;
-	}
-
-	else if (!strncmp(unit_dev, "BAT", 3 * sizeof(char)))
-	{
-		char battery_prop[STRLEN];
-		sprintf(battery_prop, "%s%s", tmp, "capacity");
-		read_file(battery_prop, callback_BAT_capacity, &ps->b);
-		sprintf(battery_prop, "%s%s", tmp, "capacity_level");
-		read_file(battery_prop, callback_BAT_capacity_level, &ps->b);
-		sprintf(battery_prop, "%s%s", tmp, "charge_full");
-		read_file(battery_prop, callback_BAT_charge_full, &ps->b);
-		sprintf(battery_prop, "%s%s", tmp, "charge_now");
-		read_file(battery_prop, callback_BAT_charge_now, &ps->b);
-		sprintf(battery_prop, "%s%s", tmp, "status");
-		read_file(battery_prop, callback_BAT_status, &ps->b);
-
-		if (ps->b.status == 'F')
-			sprintf(status, "%s%s%c", status, SEPERATOR, ps->b.status);
-
-		else sprintf(status, "%s%s%c %u%%", status, SEPERATOR, ps->b.status, ps->b.capacity);
-
-		interval = UPDATE_INTV_ON_BATTERY;
-	}
-
-	return NULL;
-}
-
-inline static void ps(void)
-{
-	PS ps;
-	read_dir(POWER_SUPPLIES, callback_ps, &ps);
-}
-
-inline static void str_append(char *string, const char *sym, float numeric)
+static char *format_units(float val)
 {
 	/* Function expects numeric to be in kB units */
-	if (numeric * kB < kB)
-		sprintf(string, "%s %s%.0fB", string, sym, numeric * kB);
+  static char STRING[8];
 
-	else if (numeric * kB >= kB && numeric * kB < mB)
-		sprintf(string, "%s %s%.0fK", string, sym, numeric);
+	if (val * kB < kB)
+		sprintf(STRING, "%.0fB", val * kB);
 
-	else if (numeric * kB >= mB && numeric * kB < gB)
-		sprintf(string, "%s %s%.1fM", string, sym, numeric / kB);
+	else if (val * kB > kB - 1 && val * kB < mB)
+		sprintf(STRING, "%.0fK", val);
 
-	else if (numeric * kB >= gB)
-		sprintf(string, "%s %s%.1fG", string, sym, numeric / mB);
+	else if (val * kB > mB - 1 && val * kB < gB)
+		sprintf(STRING, "%.1fM", val / kB);
+
+	else if (val * kB > gB - 1)
+		sprintf(STRING, "%.1fG", val / mB);
+
+  return STRING;
 }
 
-inline static const char *tail(const char *file, unsigned char n)
+static void date(char TIME[], size_t size)
 {
-	FILE *fp;
-	static char line[STRLEN];
-	unsigned char i = 1;
-	signed char err;
+	time_t t = time(NULL);
+	strftime(TIME , size, "%l:%M %a %d %b", localtime(&t));
+}
 
-	if (!(fp = fopen(file, "a+")))
+static void battery_state_cb(void *data, const char STRING[])
+{
+  battery_t *battery = data, tmp;
+	if (sscanf(STRING, "charging state: %s", tmp.STATE))
+    strcpy(battery->STATE, tmp.STATE);
+
+  else if (sscanf(STRING, "present rate: %d", &tmp.rate))
+    battery->rate = tmp.rate;
+
+  else if (sscanf(STRING, "remaining capacity: %d", &tmp.remaining))
+  {
+    battery->remaining = tmp.remaining;
+    battery->perc = (float) battery->remaining / battery->capacity * 100;
+  }
+}
+
+static void snd(char SND[])
+{
+  FILE *fp = popen(SND_CMD, "r");
+  if (fp)
+  {
+    char STRING[256];
+    fgets(STRING, 256, fp);
+    fgets(STRING, 256, fp);
+    sscanf(STRING, "%*[^ ] %*[^ ] %*[^ ] %*[^ ]%s ", SND);
+    pclose(fp);
+  }
+}
+
+static void battery_info_cb(void *data, const char STRING[])
+{
+  battery_t *battery = data, tmp;
+	if (sscanf(STRING, "design capacity: %d", &tmp.capacity))
+    battery->capacity = tmp.capacity;
+}
+
+static void battery_cb(void *data, const char STRING[])
+{
+  batteries_t *batteries = data;
+  unsigned *NBAT = &batteries->NBAT;
+  if (strlen(STRING))
+  {
+    strcpy(batteries->BATTERY[*NBAT].BAT, STRING);
+    (*NBAT)++;
+  }
+}
+
+static void init_batteries(batteries_t *batteries)
+{
+  batteries->NBAT = 0;
+  read_dir(batteries, battery_cb, ACPI_BAT); 
+
+  for (unsigned i = 0; i < batteries->NBAT; i++)
+  {
+    char INFOFILE[32], *bat = batteries->BATTERY[i].BAT;
+    sprintf(INFOFILE, "%s/%s/info", ACPI_BAT, bat);
+    read_file(&batteries->BATTERY[i], battery_info_cb, INFOFILE);
+    sprintf(batteries->BATTERY[i].STATEFILE, "%s/%s/state", ACPI_BAT, bat);
+  }
+}
+
+static void ac_cb(void *data, const char STRING[])
+{
+  bool *ac_state = data;
+  char STATE[16];
+	sscanf(STRING, "state: %s", STATE);
+
+  if (strcmp(STATE, "on-line") == 0)
+    *ac_state = 1;
+  
+  else
+    *ac_state = 0;
+}
+
+static void tail(char LINE[], size_t size, const char FILENAME[], unsigned char n)
+{
+	static FILE *fp;
+	static unsigned char i = 1;
+	static signed char err;
+
+	if (!(fp = fopen(FILENAME, "a+")))
 	{
-		fprintf(stderr, "Unable to open file\n");
-		return NULL;
+		fprintf(stderr, "Unable to open file %s\n", FILENAME);
+		return;
 	}
 
 	fseek(fp, -sizeof(char), SEEK_END);
@@ -291,198 +274,172 @@ inline static const char *tail(const char *file, unsigned char n)
 	if (err)
 		fseek(fp, 0L, SEEK_SET);
 
-	fgets(line, sizeof line, fp);
+	fgets(LINE, size, fp);
 	fclose(fp);	
-	line[strlen(line) - 1] = '\0';
-	return line;
+	LINE[strlen(LINE) - 1] = '\0';
 }
-
-void *callback_idempotent(const char *line, void *data)
+/*
+static void *callback_idempotent(const char *line, void *data)
 {
 	(void) *line;
 	(void) data;
 	return NULL;
 }
-
-inline static void public_ip(IP *ip)
+*/
+static void public_ip(ip_t *ip)
 {
-	char prev_ip[SIZE];
-	unsigned int d[4];
+	static unsigned int D[4];
 	CURLcode result = curl_easy_perform(ip->handle);
 
 	if (result != CURLE_OK ||
-		sscanf(ip->buffer, "%3d.%3d.%3d.%3d", &d[0], &d[1], &d[2], &d[3]) != 4)
+		sscanf(ip->BUFFER, "%3d.%3d.%3d.%3d", &D[0], &D[1], &D[2], &D[3]) != 4)
 		return;
 
-	strcpy(prev_ip, tail(iplist, 2));
+  char PREV[64];
+	tail(PREV, sizeof PREV, IPLIST, 2);
+	strcpy(ip->PREV, PREV);
 
-	if (strcmp(ip->buffer, prev_ip))
+	if (strcmp(ip->BUFFER, ip->PREV))
 	{
-		FILE *fp;
+		static FILE *fp;
 
-		if (!(fp = fopen(iplist, "a+")))
+		if (!(fp = fopen(IPLIST, "a+")))
 			return;
 
-		fprintf(fp, "%s\n", ip->buffer);
+		fprintf(fp, "%s\n", ip->BUFFER);
 		fclose(fp);
 	}
 
-	else strcpy(prev_ip, tail(iplist, 3));
-
-	if (!strcmp(prev_ip, ip->buffer))
-		sprintf(status, "%s%s%s", status, SEPERATOR, ip->buffer);
-
 	else
-		sprintf(status, "%s%s%s%s%s", status, SEPERATOR, prev_ip, RIGHT_ARROW, ip->buffer);
+  {
+    tail(PREV, sizeof PREV, IPLIST, 3);
+    strcpy(ip->PREV, PREV);
+  }
 }
 
-inline static void *callback_net(const char *line, void *data)
+static void ssid(char SSID[], size_t size, const char NETIF[])
 {
-	Net *ns = data, tmp;
+  struct iwreq wreq;
+  memset(&wreq, 0, sizeof wreq);
+  sprintf(wreq.ifr_name, NETIF);
+  int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+  if(sockfd > 0)
+  {
+    wreq.u.essid.pointer = SSID;
+    wreq.u.essid.length = size - 1;
+    ioctl(sockfd, SIOCGIWESSID, &wreq);
+  }
+}
 
-	sscanf(line, "%s %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ]",
-		tmp.if_name,
-		&tmp.RX_bytes,
-		&tmp.TX_bytes);
+static void wireless_cb(void *data, const char LINE[])
+{
+	wireless_t *wireless = data, tmp;
+	sscanf(LINE, "%s %*[^ ] %d", tmp.IFNAME, &tmp.link);
 
-	if (strncmp(tmp.if_name, ns->net_if, strlen(ns->net_if)) == 0)
+	if (strncmp(tmp.IFNAME, wireless->net->netif, strlen(wireless->net->netif)) == 0)
 	{
-		tmp.RX_bytes /= kB;
-		tmp.TX_bytes /= kB;
-		ns->down_kbytes = (tmp.RX_bytes - ns->RX_bytes) / interval;
-		ns->up_kbytes = (tmp.TX_bytes - ns->TX_bytes) / interval;
-		ns->RX_bytes = tmp.RX_bytes;
-		ns->TX_bytes = tmp.TX_bytes;
+		strncpy(wireless->IFNAME, tmp.IFNAME, strlen(wireless->net->netif));
+		wireless->link = tmp.link;
 	}
 
-	return NULL;
+	else wireless->link = 0;
 }
 
-inline static void *callback_wireless(const char *line, void *data)
+static void net_cb(void *data, const char LINE[])
 {
-	Wireless *w = data, tmp;
-	sscanf(line, "%s %*[^ ] %d", tmp.if_name, &tmp.link);
+	net_t *net = data, tmp;
 
-	if (strncmp(tmp.if_name, w->ns->net_if, strlen(w->ns->net_if)) == 0)
+	sscanf(LINE, "%s %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ]",
+		tmp.IFNAME,
+		&tmp.RXbytes,
+		&tmp.TXbytes);
+
+	if (strncmp(tmp.IFNAME, net->netif, strlen(net->netif)) == 0)
 	{
-		strncpy(w->if_name, tmp.if_name, strlen(w->ns->net_if));
-		w->link = tmp.link;
-	}
-
-	else w->link = 0;
-
-	return NULL;
-}
-
-inline static void net(Net *ns)
-{
-	register unsigned char i, N = LENGTH(net_if);
-	Wireless w[N];
-
-	for (i = 0; i < N; i++)
-	{
-		ns[i].net_if = net_if[i];
-		read_file(NET_ADAPTERS, callback_net, &ns[i]);
-		w[i].ns = &ns[i];
-		read_file(WIRELESS, callback_wireless, &w[i]);
-
-		if (strcmp(ns[i].net_if, w[i].if_name) == 0 && w[i].link)
-			sprintf(status, "%s%s%s %.0f%%", status, SEPERATOR, ns[i].net_if, (w[i].link / 70.) * 100);
-
-		else
-			sprintf(status, "%s%s%s", status, SEPERATOR, ns[i].net_if);
-
-		str_append(status, UP_ARROW, ns[i].up_kbytes);
-		str_append(status, "", ns[i].TX_bytes);
-		str_append(status, DOWN_ARROW, ns[i].down_kbytes);
-		str_append(status, "", ns[i].RX_bytes);
+		tmp.RXbytes /= kB;
+		tmp.TXbytes /= kB;
+		net->downkbytes = (tmp.RXbytes - net->RXbytes) / interval;
+		net->upkbytes = (tmp.TXbytes - net->TXbytes) / interval;
+		net->RXbytes = tmp.RXbytes;
+		net->TXbytes = tmp.TXbytes;
 	}
 }
 
-inline static void du(void)
+static float wireless_link(wireless_t *wireless)
 {
-	struct statvfs fs;
-	register unsigned char i, N = LENGTH(dir), perc;
-
-	for (i = 0; i < N; i++)
-	{
-		if (statvfs(dir[i], &fs) < 0)
-		{
-			printf("Unable to get fs info\n");
-			continue;
-		}
-
-		perc = (1 - ((float) fs.f_bfree / (float) fs.f_blocks)) * 100;
-		sprintf(status, "%s %s %u%%", status, dir[i], perc);
- 	}
+  return wireless->link / 70. * 100;
 }
 
-inline static void *callback_io(const char *line, void *data)
+static void init_net(net_t NET[], wireless_t WLAN[])
 {
-	Diskstats *ds = data, tmp;
-	sscanf(line, " %*[^ ] %*[^ ] %s %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ]",
-		tmp.dev_name,
+	for (unsigned i = 0; i < LENGTH(NETIF); i++)
+	{
+		NET[i].netif = NETIF[i];
+		WLAN[i].net = &NET[i];
+    read_file(&NET[i], net_cb, NET_ADAPTERS);
+    read_file(&WLAN[i], wireless_cb, WIRELESS);
+  }
+}
+
+static unsigned du_perc(const char DIRECTORY[])
+{
+	static struct statvfs fs;
+
+  if (statvfs(DIRECTORY, &fs) < 0)
+  {
+    printf("Unable to get fs info %s\n", DIRECTORY);
+    return 0;
+  }
+
+  return (1 - ((float) fs.f_bfree / (float) fs.f_blocks)) * 100;
+}
+
+static void blkdev_cb(void *data, const char LINE[])
+{
+	diskstats_t *diskstats = data, tmp;
+	sscanf(LINE, " %*[^ ] %*[^ ] %s %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ]",
+		tmp.DEVNAME,
 		&tmp.rd_sec_or_wr_ios,
 		&tmp.wr_sec);
 
-	if (strcmp(tmp.dev_name, ds->disk) == 0)
+	if (strcmp(tmp.DEVNAME, diskstats->blkdev) == 0)
 	{
-		ds->read_kBs = (tmp.rd_sec_or_wr_ios - ds->rd_sec_or_wr_ios) / 2. / interval;
-		ds->write_kBs = (tmp.wr_sec - ds->wr_sec) / 2. / interval;
-		ds->rd_sec_or_wr_ios =  tmp.rd_sec_or_wr_ios;
-		ds->wr_sec = tmp.wr_sec;
-	}
-
-	return NULL;
-}
-
-inline static void io(Diskstats *ds)
-{
-	register unsigned char i, N = LENGTH(disk);
-	sprintf(status, "%s%s", status, SEPERATOR);
-
-	for (i = 0; i < N; i++)
-	{
-		ds[i].disk = disk[i];
-		read_file(DISKSTAT, callback_io, &ds[i]);
-		strcat(status, disk[i]);
-		str_append(status, UP_ARROW, ds[i].read_kBs);
-		str_append(status, DOWN_ARROW, ds[i].write_kBs);
-		strcat(status, " ");
+		diskstats->readkbs = (tmp.rd_sec_or_wr_ios - diskstats->rd_sec_or_wr_ios) / 2. / interval;
+		diskstats->writekbs = (tmp.wr_sec - diskstats->wr_sec) / 2. / interval;
+		diskstats->rd_sec_or_wr_ios =  tmp.rd_sec_or_wr_ios;
+		diskstats->wr_sec = tmp.wr_sec;
 	}
 }
 
-inline static void *callback_mem(const char *line, void *data)
+static void init_diskstats(diskstats_t DISKSTATS[])
 {
-	Mem *m = data;
-
-	sscanf(line, "MemTotal: %lu", &m->MemTotal);
-	sscanf(line, "MemFree: %lu", &m->MemFree);
-	sscanf(line, "MemAvailable: %lu", &m->MemAvailable);
-	sscanf(line, "Buffers: %lu", &m->Buffers);
-	sscanf(line, "Cached: %lu", &m->Cached);
-	sscanf(line, "SwapCached: %lu", &m->SwapCached);
-	sscanf(line, "SwapTotal: %lu", &m->SwapTotal);
-	sscanf(line, "SwapFree: %lu", &m->SwapFree);
-
-	return NULL;
+	for (unsigned i = 0; i < LENGTH(BLKDEV); i++)
+	{
+		DISKSTATS[i].blkdev = BLKDEV[i];
+    read_file(&DISKSTATS[i], blkdev_cb, DISKSTAT);
+	}
 }
 
-inline static void mem(void)
+static void mem_cb(void *data, const char LINE[])
 {
-	Mem m;
-	read_file(RAM, callback_mem, &m);
-	float perc = (float) (m.MemTotal - m.MemFree - m.Buffers - m.Cached) / m.MemTotal * 100;
-	float swap = m.SwapTotal - m.SwapFree - m.SwapCached;
-	sprintf(status, "%s%s%.0f%%", status, SEPERATOR, perc);
-	str_append(status, "\0", swap);
+	mem_t *mem = data;
+	sscanf(LINE, "MemTotal: %lu", &mem->total);
+	sscanf(LINE, "MemFree: %lu", &mem->free);
+	sscanf(LINE, "MemAvailable: %lu", &mem->available);
+	sscanf(LINE, "Buffers: %lu", &mem->buffers);
+	sscanf(LINE, "Cached: %lu", &mem->cached);
+	sscanf(LINE, "SwapCached: %lu", &mem->swapcached);
+	sscanf(LINE, "SwapTotal: %lu", &mem->swaptotal);
+	sscanf(LINE, "SwapFree: %lu", &mem->swapfree);
+	mem->perc = (float) (mem->total - mem->free - mem->buffers - mem->cached) / mem->total * 100;
+  mem->swap = mem->swaptotal - mem->swapfree - mem->swapcached;
 }
 
-inline static void *callback_cpu(const char *line, void *data)
+static void cpu_cb(void *data, const char LINE[])
 {
-	Cpu *c = data, tmp;
+	cpu_t *cpu = data, tmp;
 
-	if (sscanf(line, "cpu%*[^0-9] %lu %lu %lu %lu %lu %lu %lu",
+	if (sscanf(LINE, "cpu%*[^0-9] %lu %lu %lu %lu %lu %lu %lu",
 		&tmp.user,
 		&tmp.nice,
 		&tmp.system,
@@ -491,64 +448,55 @@ inline static void *callback_cpu(const char *line, void *data)
 		&tmp.irq,
 		&tmp.softirq) == 7)
 	{
-		c->perc = (double) (tmp.user + tmp.nice + tmp.system + tmp.irq + tmp.softirq
-			- c->user - c->nice - c->system - c->irq - c->softirq) /
+		cpu->perc = (double) (tmp.user + tmp.nice + tmp.system + tmp.irq + tmp.softirq
+			- cpu->user - cpu->nice - cpu->system - cpu->irq - cpu->softirq) /
 			 (double) (tmp.user + tmp.nice + tmp.system + tmp.idle + tmp.iowait + tmp.irq + tmp.softirq
-			- c->user - c->nice - c->system - c->idle - c->iowait - c->irq - c->softirq) * 100.;
+			- cpu->user - cpu->nice - cpu->system - cpu->idle - cpu->iowait - cpu->irq - cpu->softirq) * 100.;
 
-		c->user = tmp.user;
-		c->nice = tmp.nice;
-		c->system = tmp.system;
-		c->idle = tmp.idle;
-		c->iowait = tmp.iowait;
-		c->irq = tmp.irq;
-		c->softirq = tmp.softirq;
+		cpu->user = tmp.user;
+		cpu->nice = tmp.nice;
+		cpu->system = tmp.system;
+		cpu->idle = tmp.idle;
+		cpu->iowait = tmp.iowait;
+		cpu->irq = tmp.irq;
+		cpu->softirq = tmp.softirq;
 	}
 
-	else if (sscanf(line, "processor : %d", &tmp.processor) == 1)
-		c->processor = tmp.processor;
+	else if (sscanf(LINE, "processor : %d", &tmp.processor) == 1)
+		cpu->processor = tmp.processor;
 
-	else if (sscanf(line, "cpu MHz : %f", &tmp.mhz) == 1)
+	else if (sscanf(LINE, "cpu MHz : %f", &tmp.mhz) == 1)
 		/* Calculate the rolling average wrt number of cores */
-		c->mhz = (c->mhz * (c->processor) + tmp.mhz) / (c->processor + 1);
-
-	return NULL;
+		cpu->mhz = (cpu->mhz * (cpu->processor) + tmp.mhz) / (cpu->processor + 1);
 }
 
-inline static void cpu(Cpu *c)
+static size_t writefunc(void *ptr, size_t size, size_t nmemb, void *data)
 {
-	read_file(CPU, callback_cpu, c);
-	read_file(STAT, callback_cpu, c);
-	sprintf(status, "%.0f%% %.0fMHz", c->perc, c->mhz);
-}
-
-inline static size_t writefunc(void *ptr, size_t size, size_t nmemb, void *data)
-{
-	IP *ip = data;
+	ip_t *ip = data;
 	size_t S = size * nmemb;
 
-	if (S < sizeof ip->buffer)
+	if (S < sizeof ip->BUFFER)
 	{
-		memset(ip->buffer, 0, S);
-		memcpy(ip->buffer, ptr, S);
-		ip->buffer[S] = '\0';
+		memset(ip->BUFFER, 0, S);
+		memcpy(ip->BUFFER, ptr, S);
+		ip->BUFFER[S] = '\0';
 	}
 
-	else ip->buffer[0] = '\0';
+	else ip->BUFFER[0] = '\0';
 
 	return S;
 }
 
-void deinit_curl(IP *ip)
+static void deinit_curl(ip_t *ip)
 {
 	curl_easy_cleanup(ip->handle);
 }
 
-void init_curl(IP *ip)
+static void init_curl(ip_t *ip)
 {
 	curl_global_init(CURL_GLOBAL_ALL);
 	ip->handle = curl_easy_init();
-	curl_easy_setopt(ip->handle, CURLOPT_URL, check_ip_url[0]);
+	curl_easy_setopt(ip->handle, CURLOPT_URL, IPURL[0]);
 	curl_easy_setopt(ip->handle, CURLOPT_WRITEFUNCTION, writefunc);
 	curl_easy_setopt(ip->handle, CURLOPT_WRITEDATA, ip);
 	curl_easy_setopt(ip->handle, CURLOPT_TIMEOUT, 1L);
@@ -564,43 +512,95 @@ int main(int argc, char **argv)
 {
 	(void) argc;
 	(void) **argv;
-
-	struct timeval tv;
-	struct sigaction SA;
+	static struct timeval tv;
+	static struct sigaction SA;
 	memset(&SA, 0, sizeof SA);
 	SA.sa_handler = set_quit_flag;
 	sigaction(SIGINT,  &SA, NULL);
 	sigaction(SIGTERM, &SA, NULL);
 	setlocale(LC_ALL, "");
-	Display *dpy;
-
-	if (!(dpy = XOpenDisplay(NULL)))
-	{
-		fprintf(stderr, "Cannot open display\n");
-		return 1;
-	}
-
+  setbuf(stdout, NULL);
+  cpu_t cpu = { };
+  mem_t mem = { };
+  diskstats_t DISKSTATS[LENGTH(BLKDEV)] = { };
+  init_diskstats(DISKSTATS);
+  net_t NET[LENGTH(NETIF)] = { };
+  wireless_t WLAN[LENGTH(NETIF)] = { };
+  init_net(NET, WLAN);
+  ip_t ip;
 	init_curl(&ip);
+  bool ac_state;
+  batteries_t batteries;
+  init_batteries(&batteries);
+  char SSID[16] = { }, SND[16], TIME[32];
 
 	while (!quit)
 	{
-		// Getter Functions
-		cpu(&c);
-		mem();
-		io(ds);
-		du();
-		net(ns);
-		public_ip(&ip);
-		ps();
-		date();
+	  read_file(&cpu, cpu_cb, CPU);
+	  read_file(&cpu, cpu_cb, STAT);
+	  read_file(&mem, mem_cb, MEM);
+    fprintf(stdout, "%.0lf%% %.0fMHz", cpu.perc, cpu.mhz);
+	  fprintf(stdout, "%s%.0f%% [%s]", SEPERATOR, mem.perc, format_units(mem.swap));
+	
+    for (unsigned i = 0; i < LENGTH(BLKDEV); i++)
+    {
+      read_file(&DISKSTATS[i], blkdev_cb, DISKSTAT);
+	    fprintf(stdout, "%s%s ", SEPERATOR, BLKDEV[i]);
+	    fprintf(stdout, "%s%s ", UP, format_units(DISKSTATS[i].readkbs));
+	    fprintf(stdout, "%s%s", DOWN, format_units(DISKSTATS[i].writekbs));
+    }
+	
+    fprintf(stdout, "%s", SEPERATOR);
+    for (unsigned i = 0; i < LENGTH(DIRECTORY); i++)
+      fprintf(stdout, "%s %u%% ", DIRECTORY[i], du_perc(DIRECTORY[i]));
 
-		// Hack to space the string from the tray
-		strcat(status, FULL_SPACE);
+    for (unsigned i = 0; i < LENGTH(NETIF); i++)
+    {
+      read_file(&NET[i], net_cb, NET_ADAPTERS);
+      read_file(&WLAN[i], wireless_cb, WIRELESS);
+      float wl = wireless_link(&WLAN[i]);
+      if (!wl)
+			  fprintf(stdout, "%s%s ", SEPERATOR, NET[i].netif);
 
-		// Update the root display with the status string
-		XStoreName(dpy, DefaultRootWindow(dpy), status);
-		XSync(dpy, False);
+      else
+      {
+        ssid(SSID, sizeof SSID, NET[i].netif);
+        fprintf(stdout, "%s%s %s %.0f%% ", SEPERATOR, NET[i].netif, SSID, wl);
+      }
+		  
+      fprintf(stdout, "%s%s", UP, format_units(NET[i].upkbytes));
+      fprintf(stdout, "[%s] ", format_units(NET[i].TXbytes));
+		  fprintf(stdout, "%s%s", DOWN, format_units(NET[i].downkbytes));
+      fprintf(stdout, "[%s]", format_units(NET[i].RXbytes));
+    }
 
+    public_ip(&ip);
+	  if (!strcmp(ip.PREV, ip.BUFFER))
+		  fprintf(stdout, "%s%s", SEPERATOR, ip.BUFFER);
+
+	  else
+		  fprintf(stdout, "%s%s%s%s", SEPERATOR, ip.PREV, RIGHT_ARROW, ip.BUFFER);
+	
+    read_file(&ac_state, ac_cb, ACPI_ACSTATE);
+    if (ac_state)
+      interval = UPDATE_INTV;
+
+    else
+      interval = UPDATE_INTV_ON_BATTERY;
+
+    for (unsigned i = 0; i < batteries.NBAT; i++)
+    {
+      read_file(&batteries.BATTERY[i], battery_state_cb, batteries.BATTERY[i].STATEFILE);
+      fprintf(stdout, "%s%s %.0f%% %c", SEPERATOR, 
+          batteries.BATTERY[i].BAT, 
+          batteries.BATTERY[i].perc, 
+          batteries.BATTERY[i].STATE[0] - 32);
+    }
+
+    snd(SND);
+	  fprintf(stdout, "%s%s", SEPERATOR, SND);
+    date(TIME, sizeof TIME);
+	  fprintf(stdout, "%s%s", SEPERATOR, TIME);
 		// Wait
 		tv.tv_sec = interval;
 		tv.tv_usec = 0;
@@ -608,7 +608,5 @@ int main(int argc, char **argv)
 	}
 
 	deinit_curl(&ip);
-	XStoreName(dpy, DefaultRootWindow(dpy), NULL);
-	XCloseDisplay(dpy);
 	return 0;
 }
