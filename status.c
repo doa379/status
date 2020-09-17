@@ -201,9 +201,11 @@ static void snd(char SND[])
   if (fp)
   {
     char STRING[256];
-    fgets(STRING, 256, fp);
-    fgets(STRING, 256, fp);
-    sscanf(STRING, "%*[^ ] %*[^ ] %*[^ ] %*[^ ]%s ", SND);
+    if (fgets(STRING, 256, fp))
+    {
+      fgets(STRING, 256, fp);
+      sscanf(STRING, "%*[^ ] %*[^ ] %*[^ ] %*[^ ] %s ", SND);
+    }
     pclose(fp);
   }
 }
@@ -532,7 +534,7 @@ int main(int argc, char **argv)
   bool ac_state;
   batteries_t batteries;
   init_batteries(&batteries);
-  char SSID[16] = { }, SND[16], TIME[32];
+  char SSID[16] = { }, SND[16] = { }, TIME[32];
 
 	while (!quit)
 	{
@@ -601,6 +603,7 @@ int main(int argc, char **argv)
 	  fprintf(stdout, "%s%s", SEPERATOR, SND);
     date(TIME, sizeof TIME);
 	  fprintf(stdout, "%s%s", SEPERATOR, TIME);
+	  fprintf(stdout, "%s\n", FULL_SPACE);
 		// Wait
 		tv.tv_sec = interval;
 		tv.tv_usec = 0;
