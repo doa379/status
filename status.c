@@ -25,24 +25,25 @@
 #define kB			1024
 #define mB			(kB * kB)
 #define gB			(kB * mB)
-#define UP_ARROW		"\u2b06"
-#define DOWN_ARROW		"\u2b07"
-#define UP_TRI          "\u25b4"
-#define DOWN_TRI        "\u25be"
-#define RIGHT_ARROW		"\u27a1"
-#define FULL_SPACE		"\u2000"
-#define SHORT_SPACE		"\u2005"
-#define HEAVY_HORIZONTAL	"\u2501"
-#define HEAVY_VERTICAL		"\u2503"
-#define DOUBLE_VERTICAL		"\u2551"
+#define UP_ARROW                "\u2b06"
+#define DOWN_ARROW		          "\u2b07"
+#define UP_TRI                  "\u25b4"
+#define DOWN_TRI                "\u25be"
+#define RIGHT_ARROW		          "\u27a1"
+#define FULL_SPACE		          "\u2000"
+#define SHORT_SPACE		          "\u2005"
+#define HEAVY_HORIZONTAL        "\u2501"
+#define HEAVY_VERTICAL		      "\u2503"
+#define DOUBLE_VERTICAL		      "\u2551"
 #define LF_THREE_EIGHTHS_BLOCK	" \u258d"
-#define LIGHT_SHADE		"\u2591"
-#define MEDIUM_SHADE		" \u2592 "
-#define DARK_SHADE		" \u2593 "
-#define DASH_VERT       "\u250a"
-#define UP              UP_TRI
-#define DOWN            DOWN_TRI
-#define SEPERATOR		"|"
+#define LIGHT_SHADE		          "\u2591"
+#define MEDIUM_SHADE		        " \u2592 "
+#define DARK_SHADE		          " \u2593 "
+#define DASH_VERT               "\u250a"
+#define UP                      UP_TRI
+#define DOWN                    DOWN_TRI
+#define SNDSYM                  "♬"
+#define SEPERATOR		            "|"
 
 typedef struct
 {
@@ -124,10 +125,7 @@ static void read_file(void *data, void (*cb)(), const char FILENAME[])
 	static char LINE[STRLEN];
 
 	if (!(fp = fopen(FILENAME, "r")))
-	{
-		fprintf(stderr, "Unable to open file %s\n", FILENAME);
 		return;
-	}
 
 	while (fgets(LINE, sizeof LINE, fp))
 		cb(data, LINE);
@@ -141,10 +139,7 @@ static void read_dir(void *data, void (*cb)(), const char DIRNAME[])
 	static struct dirent *d;
 
 	if (!(dp = opendir(DIRNAME)))
-	{
-		fprintf(stderr, "Unable to open dir %s\n", DIRNAME);
 		return;
-	}
 
 	while ((d = readdir(dp)))
     if (strcmp(d->d_name, ".") && strcmp(d->d_name, ".."))
@@ -206,6 +201,8 @@ static void snd(char SND[])
       fgets(STRING, 256, fp);
       sscanf(STRING, "%*[^ ] %*[^ ] %*[^ ] %*[^ ] %s ", SND);
     }
+
+    else SND[0] = '\0';
     pclose(fp);
   }
 }
@@ -534,7 +531,7 @@ int main(int argc, char **argv)
   bool ac_state;
   batteries_t batteries;
   init_batteries(&batteries);
-  char SSID[16] = { }, SND[16] = { }, TIME[32];
+  char SSID[16] = { }, SND[16], TIME[32];
 
 	while (!quit)
 	{
@@ -600,10 +597,9 @@ int main(int argc, char **argv)
     }
 
     snd(SND);
-	  fprintf(stdout, "%s%s", SEPERATOR, SND);
+	  fprintf(stdout, "%s%s%s", SEPERATOR, SNDSYM, SND);
     date(TIME, sizeof TIME);
-	  fprintf(stdout, "%s%s", SEPERATOR, TIME);
-	  fprintf(stdout, "%s\n", FULL_SPACE);
+	  fprintf(stdout, "%s%s\n", SEPERATOR, TIME);
 		// Wait
 		tv.tv_sec = interval;
 		tv.tv_usec = 0;
