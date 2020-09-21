@@ -121,12 +121,11 @@ static bool quit = 0;
 
 static void read_file(void *data, void (*cb)(), const char FILENAME[])
 {
-  static FILE *fp;
-  static char LINE[STRLEN];
-
-  if (!(fp = fopen(FILENAME, "r")))
+  FILE *fp = fopen(FILENAME, "r");
+  if (!fp)
     return;
 
+  static char LINE[STRLEN];
   while (fgets(LINE, sizeof LINE, fp))
     cb(data, LINE);
 
@@ -135,12 +134,11 @@ static void read_file(void *data, void (*cb)(), const char FILENAME[])
 
 static void read_dir(void *data, void (*cb)(), const char DIRNAME[])
 {
-  static DIR *dp;
-  static struct dirent *d;
-
-  if (!(dp = opendir(DIRNAME)))
+  DIR *dp = opendir(DIRNAME);
+  if (!dp)
     return;
 
+  static struct dirent *d;
   while ((d = readdir(dp)))
     if (strcmp(d->d_name, ".") && strcmp(d->d_name, ".."))
       cb(data, d->d_name);
@@ -193,18 +191,18 @@ static void battery_state_cb(void *data, const char STRING[])
 static void snd(char SND[])
 {
   FILE *fp = popen(SND_CMD, "r");
-  if (fp)
-  {
-    char STRING[256];
-    if (fgets(STRING, 256, fp))
-    {
-      fgets(STRING, 256, fp);
-      sscanf(STRING, "%*[^ ] %*[^ ] %*[^ ] %*[^ ] %s ", SND);
-    }
+  if (!fp)
+    return;
 
-    else SND[0] = '\0';
-    pclose(fp);
+  char STRING[256];
+  if (fgets(STRING, 256, fp))
+  {
+    fgets(STRING, 256, fp);
+    sscanf(STRING, "%*[^ ] %*[^ ] %*[^ ] %*[^ ] %s ", SND);
   }
+
+  else SND[0] = '\0';
+  pclose(fp);
 }
 
 static void battery_info_cb(void *data, const char STRING[])
@@ -254,28 +252,24 @@ static void ac_cb(void *data, const char STRING[])
 
 static void tail(char LINE[], size_t size, const char FILENAME[], unsigned char n)
 {
-  static FILE *fp;
-  static unsigned char i = 1;
-  static signed char err;
-
-  if (!(fp = fopen(FILENAME, "a+")))
-  {
-    fprintf(stderr, "Unable to open file %s\n", FILENAME);
+  FILE *fp = fopen(FILENAME, "a+");
+  if (!fp)
     return;
-  }
 
+  unsigned char i = 1;
+  char err;
   fseek(fp, -sizeof(char), SEEK_END);
 
-  while (i < n && !(err = fseek(fp, -2 * sizeof(char), SEEK_CUR)))
+  while (i < n && !(err = fseek(fp, -2 * sizeof err, SEEK_CUR)))
     if (fgetc(fp)  == '\n')
       i++;
 
   if (err)
     fseek(fp, 0L, SEEK_SET);
 
-  fgets(LINE, size, fp);
+  if (fgets(LINE, size, fp))
+    LINE[strlen(LINE) - 1] = '\0';
   fclose(fp);	
-  LINE[strlen(LINE) - 1] = '\0';
 }
 /*
    static void *callback_idempotent(const char *line, void *data)
@@ -287,22 +281,23 @@ static void tail(char LINE[], size_t size, const char FILENAME[], unsigned char 
    */
 static void public_ip(ip_t *ip)
 {
-  static unsigned int D[4];
+  unsigned char D[4];
   CURLcode result = curl_easy_perform(ip->handle);
-
   if (result != CURLE_OK ||
-      sscanf(ip->BUFFER, "%3d.%3d.%3d.%3d", &D[0], &D[1], &D[2], &D[3]) != 4)
+      sscanf(ip->BUFFER, "%3c.%3c.%3c.%3c", &D[0], &D[1], &D[2], &D[3]) != 4)
+  {
+    strcpy(ip->BUFFER, "No IP");
     return;
+  }
 
-  char PREV[64];
+  char PREV[64] = { };
   tail(PREV, sizeof PREV, IPLIST, 2);
   strcpy(ip->PREV, PREV);
 
   if (strcmp(ip->BUFFER, ip->PREV))
   {
-    static FILE *fp;
-
-    if (!(fp = fopen(IPLIST, "a+")))
+    FILE *fp = fopen(IPLIST, "a+");
+    if (!fp)
       return;
 
     fprintf(fp, "%s\n", ip->BUFFER);
@@ -382,7 +377,7 @@ static void init_net(net_t NET[], wireless_t WLAN[])
 
 static unsigned du_perc(const char DIRECTORY[])
 {
-  static struct statvfs fs;
+  struct statvfs fs;
 
   if (statvfs(DIRECTORY, &fs) < 0)
   {
@@ -511,8 +506,8 @@ int main(int argc, char **argv)
 {
   (void) argc;
   (void) **argv;
-  static struct timeval tv;
-  static struct sigaction SA;
+  struct timeval tv;
+  struct sigaction SA;
   memset(&SA, 0, sizeof SA);
   SA.sa_handler = set_quit_flag;
   sigaction(SIGINT,  &SA, NULL);
@@ -574,7 +569,7 @@ int main(int argc, char **argv)
     }
 
     public_ip(&ip);
-    if (!strcmp(ip.PREV, ip.BUFFER))
+    if (!strcmp(ip.PREV, ip.BUFFER) || !strlen(ip.PREV))
       fprintf(stdout, "%s%s", SEPERATOR, ip.BUFFER);
 
     else
