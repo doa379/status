@@ -10,6 +10,7 @@
 #include <sys/ioctl.h>
 #include <linux/wireless.h>
 #include <curl/curl.h>
+#include <math.h>
 #include "config.h"
 
 #define LENGTH(X)		(sizeof X / sizeof X[0])
@@ -118,6 +119,94 @@ typedef struct
 static unsigned char interval = UPDATE_INTV;
 static bool quit = 0;
 
+static void print_string(const char STRING[])
+{
+  fwrite(STRING, 1, strlen(STRING), stdout);
+}
+
+static void ftoa(float val, char STRING[], unsigned prec)
+{
+  int m = log10(val);
+  int digit;
+  float tolerance = prec ? 1. / prec : 0;
+
+  while (val > tolerance)
+  {
+    float weight = pow(10.0f, m);
+    digit = floor(val / weight);
+    val -= (digit * weight);
+    *(STRING++) = '0' + digit;
+    if (m == 0 && prec)
+      *(STRING++) = '.';
+    m--;
+  }
+  *(STRING) = '\0';
+}
+
+static void print_float(const float val, unsigned prec)
+{
+  char STRING[8];
+  ftoa(val, STRING, prec);
+  print_string(STRING);
+}
+/*
+static void print_int(const int *val)
+{
+  fwrite(val, sizeof *val, 1, stdout);
+}
+*/
+static void print_formatted_units(float val)
+{
+  //Function expects numeric to be in kB units
+  if (val * kB < kB)
+  {
+    print_float(val * kB, 0);
+    print_string("B");
+    //sprintf(STRING, "%.0fB", val * kB);
+  }
+
+  else if (val * kB > kB - 1 && val * kB < mB)
+  {
+    print_float(val, 0);
+    print_string("K");
+    //sprintf(STRING, "%.0fK", val);
+  }
+
+  else if (val * kB > mB - 1 && val * kB < gB)
+  {
+    print_float(val / kB, 1);
+    print_string("M");
+    //sprintf(STRING, "%.1fM", val / kB);
+  }
+
+  else if (val * kB > gB - 1)
+  {
+    print_float(val / mB, 1);
+    print_string("G");
+    //sprintf(STRING, "%.1fG", val / mB);
+  }
+}
+
+static char *format_units(float val)
+{
+  /* Function expects numeric to be in kB units */
+  static char STRING[8];
+
+  if (val * kB < kB)
+    sprintf(STRING, "%.0fB", val * kB);
+
+  else if (val * kB > kB - 1 && val * kB < mB)
+    sprintf(STRING, "%.0fK", val);
+
+  else if (val * kB > mB - 1 && val * kB < gB)
+    sprintf(STRING, "%.1fM", val / kB);
+
+  else if (val * kB > gB - 1)
+    sprintf(STRING, "%.1fG", val / mB);
+
+  return STRING;
+}
+
 static void read_file(void *data, void (*cb)(), const char FILENAME[])
 {
   FILE *fp = fopen(FILENAME, "r");
@@ -143,26 +232,6 @@ static void read_dir(void *data, void (*cb)(), const char DIRNAME[])
       cb(data, d->d_name);
 
   closedir(dp);
-}
-
-static char *format_units(float val)
-{
-  /* Function expects numeric to be in kB units */
-  static char STRING[8];
-
-  if (val * kB < kB)
-    sprintf(STRING, "%.0fB", val * kB);
-
-  else if (val * kB > kB - 1 && val * kB < mB)
-    sprintf(STRING, "%.0fK", val);
-
-  else if (val * kB > mB - 1 && val * kB < gB)
-    sprintf(STRING, "%.1fM", val / kB);
-
-  else if (val * kB > gB - 1)
-    sprintf(STRING, "%.1fG", val / mB);
-
-  return STRING;
 }
 
 static void date(char TIME[], size_t size)
@@ -375,7 +444,6 @@ static void init_net(net_t NET[], wireless_t WLAN[])
 static unsigned du_perc(const char DIRECTORY[])
 {
   struct statvfs fs;
-
   if (statvfs(DIRECTORY, &fs) < 0)
   {
     printf("Unable to get fs info %s\n", DIRECTORY);
@@ -530,8 +598,17 @@ int main(int argc, char **argv)
     read_file(&cpu, cpu_cb, CPU);
     read_file(&cpu, cpu_cb, STAT);
     read_file(&mem, mem_cb, MEM);
-    fprintf(stdout, "%.0lf%% %.0fMHz", cpu.perc, cpu.mhz);
-    fprintf(stdout, "%s%.0f%% [%s]", SEPERATOR, mem.perc, format_units(mem.swap));
+    //fprintf(stdout, "%.0lf%% %.0fMHz", cpu.perc, cpu.mhz);
+    //fprintf(stdout, "%s%.0f%% [%s]", SEPERATOR, mem.perc, format_units(mem.swap));
+    print_float(cpu.perc, 0);
+    print_string("% ");
+    print_float(cpu.mhz, 0);
+    print_string("MHz");
+    print_string(SEPERATOR);
+    print_float(mem.perc, 0);
+    print_string("% [");
+    print_formatted_units(mem.swap);
+    print_string("]");
 
     for (unsigned i = 0; i < LENGTH(BLKDEV); i++)
     {
