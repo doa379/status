@@ -245,10 +245,8 @@ static void battery_state_cb(void *data, const char STRING[])
   battery_t *battery = data, tmp;
   if (sscanf(STRING, "charging state: %s", tmp.STATE))
     strcpy(battery->STATE, tmp.STATE);
-
   else if (sscanf(STRING, "present rate: %d", &tmp.rate))
     battery->rate = tmp.rate;
-
   else if (sscanf(STRING, "remaining capacity: %d", &tmp.remaining))
   {
     battery->remaining = tmp.remaining;
@@ -262,13 +260,9 @@ static void snd(char SND[])
   if (!fp)
     return;
 
-  char STRING[256];
-  if (fgets(STRING, 256, fp))
-  {
-    fgets(STRING, 256, fp);
+  char STRING[128];
+  if (fgets(STRING, 128, fp) && fgets(STRING, 128, fp))
     sscanf(STRING, "%*[^ ] %*[^ ] %*[^ ] %*[^ ] %s ", SND);
-  }
-
   else SND[0] = '\0';
   pclose(fp);
 }
@@ -295,7 +289,6 @@ static void init_batteries(batteries_t *batteries)
 {
   batteries->NBAT = 0;
   read_dir(batteries, battery_cb, ACPI_BAT); 
-
   for (unsigned i = 0; i < batteries->NBAT; i++)
   {
     char INFOFILE[32], *bat = batteries->BATTERY[i].BAT;
@@ -313,7 +306,6 @@ static void ac_cb(void *data, const char STRING[])
 
   if (strcmp(STATE, "on-line") == 0)
     *ac_state = 1;
-
   else
     *ac_state = 0;
 }
@@ -359,7 +351,6 @@ static void public_ip(ip_t *ip)
   char PREV[64] = { };
   tail(PREV, sizeof PREV, IPLIST, 2);
   strcpy(ip->PREV, PREV);
-
   if (strcmp(ip->BUFFER, ip->PREV))
   {
     FILE *fp = fopen(IPLIST, "a+");
@@ -369,7 +360,6 @@ static void public_ip(ip_t *ip)
     fprintf(fp, "%s\n", ip->BUFFER);
     fclose(fp);
   }
-
   else
   {
     tail(PREV, sizeof PREV, IPLIST, 3);
@@ -401,7 +391,6 @@ static void wireless_cb(void *data, const char LINE[])
     strncpy(wireless->IFNAME, tmp.IFNAME, strlen(wireless->net->netif));
     wireless->link = tmp.link;
   }
-
   else wireless->link = 0;
 }
 
@@ -523,7 +512,6 @@ static void cpu_cb(void *data, const char LINE[])
 
   else if (sscanf(LINE, "processor : %d", &tmp.processor) == 1)
     cpu->processor = tmp.processor;
-
   else if (sscanf(LINE, "cpu MHz : %f", &tmp.mhz) == 1)
     /* Calculate the rolling average wrt number of cores */
     cpu->mhz = (cpu->mhz * (cpu->processor) + tmp.mhz) / (cpu->processor + 1);
@@ -533,14 +521,12 @@ static size_t writefunc(void *ptr, size_t size, size_t nmemb, void *data)
 {
   ip_t *ip = data;
   size_t S = size * nmemb;
-
   if (S < sizeof ip->BUFFER)
   {
     memset(ip->BUFFER, 0, S);
     memcpy(ip->BUFFER, ptr, S);
     ip->BUFFER[S] = '\0';
   }
-
   else ip->BUFFER[0] = '\0';
 
   return S;
@@ -586,7 +572,7 @@ int main(int argc, char **argv)
   net_t NET[LENGTH(NETIF)] = { };
   wireless_t WLAN[LENGTH(NETIF)] = { };
   init_net(NET, WLAN);
-  ip_t ip;
+  ip_t ip = { };
   init_curl(&ip);
   bool ac_state;
   batteries_t batteries;
@@ -629,7 +615,6 @@ int main(int argc, char **argv)
       float wl = wireless_link(&WLAN[i]);
       if (!wl)
         fprintf(stdout, "%s%s ", SEPERATOR, NET[i].netif);
-
       else
       {
         ssid(SSID, sizeof SSID, NET[i].netif);
@@ -645,14 +630,12 @@ int main(int argc, char **argv)
     public_ip(&ip);
     if (!strcmp(ip.PREV, ip.BUFFER) || !strlen(ip.PREV))
       fprintf(stdout, "%s%s", SEPERATOR, ip.BUFFER);
-
     else
       fprintf(stdout, "%s%s%s%s", SEPERATOR, ip.PREV, RIGHT_ARROW, ip.BUFFER);
 
     read_file(&ac_state, ac_cb, ACPI_ACSTATE);
     if (ac_state)
       interval = UPDATE_INTV;
-
     else
       interval = UPDATE_INTV_ON_BATTERY;
 
