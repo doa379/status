@@ -243,16 +243,15 @@ static void ac_cb(void *data, const char STRING[])
 
 static void tail(char LINE[], size_t size, const char FILENAME[], unsigned char n)
 {
-  FILE *fp = fopen(FILENAME, "a+");
+  FILE *fp = fopen(FILENAME, "r");
   if (!fp)
     return;
 
-  unsigned char i = 1;
   char err;
-  fseek(fp, -sizeof(char), SEEK_END);
-
+  fseek(fp, -sizeof err, SEEK_END);
+  unsigned i = 0;
   while (i < n && !(err = fseek(fp, -2 * sizeof err, SEEK_CUR)))
-    if (fgetc(fp)  == '\n')
+    if (fgetc(fp) == '\n')
       i++;
 
   if (err)
@@ -260,29 +259,19 @@ static void tail(char LINE[], size_t size, const char FILENAME[], unsigned char 
 
   if (fgets(LINE, size, fp))
     LINE[strlen(LINE) - 1] = '\0';
-  fclose(fp);	
+  fclose(fp);
 }
-/*
-   static void *callback_idempotent(const char *line, void *data)
-   {
-   (void) *line;
-   (void) data;
-   return NULL;
-   }
-   */
+
 static void public_ip(ip_t *ip)
 {
-  CURLcode result = curl_easy_perform(ip->handle);
-  if (result != CURLE_OK)
+  char SWAP[64];
+  strcpy(SWAP, ip->BUFFER);
+  if (curl_easy_perform(ip->handle) != CURLE_OK)
   {
     strcpy(ip->BUFFER, "No IP");
     return;
   }
-
-  char PREV[64] = { };
-  tail(PREV, sizeof PREV, IPLIST, 2);
-  strcpy(ip->PREV, PREV);
-  if (strcmp(ip->BUFFER, ip->PREV))
+  else if (strcmp(ip->BUFFER, ip->PREV))
   {
     FILE *fp = fopen(IPLIST, "a+");
     if (!fp)
@@ -290,11 +279,7 @@ static void public_ip(ip_t *ip)
 
     fprintf(fp, "%s\n", ip->BUFFER);
     fclose(fp);
-  }
-  else
-  {
-    tail(PREV, sizeof PREV, IPLIST, 3);
-    strcpy(ip->PREV, PREV);
+    strcpy(ip->PREV, SWAP);
   }
 }
 
@@ -478,6 +463,18 @@ static void init_curl(ip_t *ip)
   curl_easy_setopt(ip->handle, CURLOPT_TIMEOUT, 1L);
 }
 
+static void deinit_ip(ip_t *ip)
+{
+  deinit_curl(ip);
+}
+
+static void init_ip(ip_t *ip)
+{
+  init_curl(ip);
+  ip->BUFFER[0] = '\0';
+  tail(ip->PREV, sizeof ip->PREV, IPLIST, 1);
+}
+
 void set_quit_flag(const int signo)
 {
   (void) signo;
@@ -503,8 +500,8 @@ int main(int argc, char **argv)
   net_t NET[LENGTH(NETIF)] = { };
   wireless_t WLAN[LENGTH(NETIF)] = { };
   init_net(NET, WLAN);
-  ip_t ip = { };
-  init_curl(&ip);
+  ip_t ip;
+  init_ip(&ip);
   bool ac_state;
   batteries_t batteries;
   init_batteries(&batteries);
@@ -580,6 +577,6 @@ int main(int argc, char **argv)
     select(0, NULL, NULL, NULL, &tv);
   }
 
-  deinit_curl(&ip);
+  deinit_ip(&ip);
   return 0;
 }
