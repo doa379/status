@@ -213,7 +213,7 @@ static void read_file(void *data, void (*cb)(), const char FILENAME[])
   if (!fp)
     return;
 
-  static char LINE[STRLEN];
+  char LINE[STRLEN];
   while (fgets(LINE, sizeof LINE, fp))
     cb(data, LINE);
 
@@ -226,7 +226,7 @@ static void read_dir(void *data, void (*cb)(), const char DIRNAME[])
   if (!dp)
     return;
 
-  static struct dirent *d;
+  struct dirent *d;
   while ((d = readdir(dp)))
     if (strcmp(d->d_name, ".") && strcmp(d->d_name, ".."))
       cb(data, d->d_name);
@@ -262,7 +262,7 @@ static void snd(char SND[])
 
   char STRING[128];
   if (fgets(STRING, 128, fp) && fgets(STRING, 128, fp))
-    sscanf(STRING, "%*[^ ] %*[^ ] %*[^ ] %*[^ ] %s ", SND);
+    sscanf(STRING, "%*[^ ] %*[^ ] %*[^ ] %*[^ ] %s", SND);
   else SND[0] = '\0';
   pclose(fp);
 }
@@ -356,7 +356,7 @@ static void ssid(char SSID[], size_t size, const char NETIF[])
 {
   struct iwreq wreq;
   memset(&wreq, 0, sizeof wreq);
-  sprintf(wreq.ifr_name, NETIF);
+  strcpy(wreq.ifr_name, NETIF);
   int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
   if(sockfd > 0)
   {
@@ -571,7 +571,7 @@ int main(int argc, char **argv)
   init_net(NET, WLAN);
   ip_t ip;
   init_ip(&ip);
-  bool ac_state;
+  bool ac_state = 0;
   batteries_t batteries;
   init_batteries(&batteries);
   char SSID[16] = { }, SND[16], TIME[32];
