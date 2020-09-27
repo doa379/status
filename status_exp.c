@@ -237,7 +237,7 @@ static void read_dir(void *data, void (*cb)(), const char DIRNAME[])
 static void date(char TIME[], size_t size)
 {
   time_t t = time(NULL);
-  strftime(TIME , size, "%l:%M %a %d %b", localtime(&t));
+  strftime(TIME, size, "%l:%M %a %d %b", localtime(&t));
 }
 
 static void battery_state_cb(void *data, const char STRING[])
@@ -358,6 +358,7 @@ static void ssid(char SSID[], size_t size, const char NETIF[])
   memset(&wreq, 0, sizeof wreq);
   strcpy(wreq.ifr_name, NETIF);
   int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+  memset(SSID, 0, size);
   if(sockfd > 0)
   {
     wreq.u.essid.pointer = SSID;
@@ -399,7 +400,7 @@ static void net_cb(void *data, const char LINE[])
   }
 }
 
-static float wireless_link(wireless_t *wireless)
+static unsigned wireless_link(wireless_t *wireless)
 {
   return wireless->link / 70. * 100;
 }
@@ -419,10 +420,7 @@ static unsigned du_perc(const char DIRECTORY[])
 {
   struct statvfs fs;
   if (statvfs(DIRECTORY, &fs) < 0)
-  {
-    printf("Unable to get fs info %s\n", DIRECTORY);
     return 0;
-  }
 
   return (1 - ((float) fs.f_bfree / (float) fs.f_blocks)) * 100;
 }
@@ -574,7 +572,7 @@ int main(int argc, char **argv)
   bool ac_state = 0;
   batteries_t batteries;
   init_batteries(&batteries);
-  char SSID[16] = { }, SND[16], TIME[32];
+  char SSID[16] = { }, SND[16], TIME[16];
 
   while (!quit)
   {
