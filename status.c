@@ -89,8 +89,16 @@ typedef struct
 
 typedef struct
 {
-  char IFNAME[8], ESSID[32];
+  char SSID[16];
+  struct iwreq wreq;
+  int sockfd;
+} ssid_t;
+
+typedef struct
+{
+  char IFNAME[8];
   float link, level, noise;
+  ssid_t ssid;
   net_t *net;
 } wireless_t;
 
@@ -283,19 +291,22 @@ static void public_ip(ip_t *ip)
   }
 }
 
-static void ssid(char SSID[], size_t size, const char NETIF[])
+static bool init_ssid(ssid_t *ssid, const char NETIF[])
 {
-  struct iwreq wreq;
-  memset(&wreq, 0, sizeof wreq);
-  strcpy(wreq.ifr_name, NETIF);
-  int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-  memset(SSID, 0, size);
-  if(sockfd > 0)
-  {
-    wreq.u.essid.pointer = SSID;
-    wreq.u.essid.length = size - 1;
-    ioctl(sockfd, SIOCGIWESSID, &wreq);
-  }
+  memset(&ssid->wreq, 0, sizeof ssid->wreq);
+  strcpy(ssid->wreq.ifr_name, NETIF);
+  if ((ssid->sockfd = socket(AF_INET, SOCK_DGRAM, 0)) > -1)
+    return 1;
+
+  return 0;
+}
+
+static void ssid(ssid_t *ssid)
+{
+  memset(ssid->SSID, 0, sizeof ssid->SSID);
+  ssid->wreq.u.essid.pointer = ssid->SSID;
+  ssid->wreq.u.essid.length = sizeof ssid->SSID;
+  ioctl(ssid->sockfd, SIOCGIWESSID, &ssid->wreq);
 }
 
 static void wireless_cb(void *data, const char LINE[])
@@ -340,6 +351,7 @@ static void init_net(net_t NET[], wireless_t WLAN[])
   {
     NET[i].netif = NETIF[i];
     WLAN[i].net = &NET[i];
+    while(!init_ssid(&WLAN[i].ssid, NETIF[i]));
     read_file(&NET[i], net_cb, NET_ADAPTERS);
     read_file(&WLAN[i], wireless_cb, WIRELESS);
   }
@@ -501,7 +513,7 @@ int main(int argc, char **argv)
   bool ac_state = 0;
   batteries_t batteries;
   init_batteries(&batteries);
-  char SSID[16] = { }, SND[16], TIME[32];
+  char SND[16], TIME[32];
 
   while (!quit)
   {
@@ -528,9 +540,9 @@ int main(int argc, char **argv)
       read_file(&NET[i], net_cb, NET_ADAPTERS);
       read_file(&WLAN[i], wireless_cb, WIRELESS);
       fprintf(stdout, "%s%s ", SEPERATOR, NET[i].netif);
-      ssid(SSID, sizeof SSID, NET[i].netif);
-      if (strlen(SSID))
-        fprintf(stdout, "%s %d%% ", SSID, wireless_link(&WLAN[i]));
+      ssid(&WLAN[i].ssid);
+      if (strlen(WLAN[i].ssid.SSID))
+        fprintf(stdout, "%s %d%% ", WLAN[i].ssid.SSID, wireless_link(&WLAN[i]));
 
       fprintf(stdout, "%s%s", UP, format_units(NET[i].upkbytes));
       fprintf(stdout, "(%s)", format_units(NET[i].TXbytes));
