@@ -90,7 +90,7 @@ typedef struct
 typedef struct
 {
   char IFNAME[8], ESSID[32];
-  unsigned int link;
+  float link, level, noise;
   net_t *net;
 } wireless_t;
 
@@ -301,20 +301,18 @@ static void ssid(char SSID[], size_t size, const char NETIF[])
 static void wireless_cb(void *data, const char LINE[])
 {
   wireless_t *wireless = data, tmp;
-  sscanf(LINE, "%s %*[^ ] %d", tmp.IFNAME, &tmp.link);
-
+  sscanf(LINE, "%s %*[^ ] %f %f %f", tmp.IFNAME, &tmp.link, &tmp.level, &tmp.noise);
   if (strncmp(tmp.IFNAME, wireless->net->netif, strlen(wireless->net->netif)) == 0)
   {
-    strncpy(wireless->IFNAME, tmp.IFNAME, strlen(wireless->net->netif));
     wireless->link = tmp.link;
+    wireless->level = tmp.level;
+    wireless->noise = tmp.noise;
   }
-  else wireless->link = 0;
 }
 
 static void net_cb(void *data, const char LINE[])
 {
   net_t *net = data, tmp;
-
   sscanf(LINE, "%s %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ]",
       tmp.IFNAME,
       &tmp.RXbytes,
@@ -503,7 +501,7 @@ int main(int argc, char **argv)
   bool ac_state = 0;
   batteries_t batteries;
   init_batteries(&batteries);
-  char SSID[16] = { }, SND[16], TIME[16];
+  char SSID[16] = { }, SND[16], TIME[32];
 
   while (!quit)
   {
@@ -511,14 +509,14 @@ int main(int argc, char **argv)
     read_file(&cpu, cpu_cb, STAT);
     read_file(&mem, mem_cb, MEM);
     fprintf(stdout, "%.0lf%% %.0fMHz", cpu.perc, cpu.mhz);
-    fprintf(stdout, "%s%.0f%% [%s]", SEPERATOR, mem.perc, format_units(mem.swap));
+    fprintf(stdout, "%s%.0f%% (%s)", SEPERATOR, mem.perc, format_units(mem.swap));
     
     for (unsigned i = 0; i < LENGTH(BLKDEV); i++)
     {
       read_file(&DISKSTATS[i], blkdev_cb, DISKSTAT);
       fprintf(stdout, "%s%s ", SEPERATOR, BLKDEV[i]);
-      fprintf(stdout, "%s%s", "^", format_units(DISKSTATS[i].readkbs));
-      fprintf(stdout, "%s%s", "v", format_units(DISKSTATS[i].writekbs));
+      fprintf(stdout, "%s%s", UP, format_units(DISKSTATS[i].readkbs));
+      fprintf(stdout, "%s%s", DOWN, format_units(DISKSTATS[i].writekbs));
     }
     
     fprintf(stdout, "%s", SEPERATOR);
@@ -529,26 +527,22 @@ int main(int argc, char **argv)
     {
       read_file(&NET[i], net_cb, NET_ADAPTERS);
       read_file(&WLAN[i], wireless_cb, WIRELESS);
-      unsigned wl = wireless_link(&WLAN[i]);
-      if (!wl)
-        fprintf(stdout, "%s%s ", SEPERATOR, NET[i].netif);
-      else
-      {
-        ssid(SSID, sizeof SSID, NET[i].netif);
-        fprintf(stdout, "%s%s %s %d%% ", SEPERATOR, NET[i].netif, SSID, wl);
-      }
+      fprintf(stdout, "%s%s ", SEPERATOR, NET[i].netif);
+      ssid(SSID, sizeof SSID, NET[i].netif);
+      if (strlen(SSID))
+        fprintf(stdout, "%s %d%% ", SSID, wireless_link(&WLAN[i]));
 
-      fprintf(stdout, "%s%s", "^", format_units(NET[i].upkbytes));
-      fprintf(stdout, "[%s]", format_units(NET[i].TXbytes));
-      fprintf(stdout, "%s%s", "v", format_units(NET[i].downkbytes));
-      fprintf(stdout, "[%s]", format_units(NET[i].RXbytes));
+      fprintf(stdout, "%s%s", UP, format_units(NET[i].upkbytes));
+      fprintf(stdout, "(%s)", format_units(NET[i].TXbytes));
+      fprintf(stdout, "%s%s", DOWN, format_units(NET[i].downkbytes));
+      fprintf(stdout, "(%s)", format_units(NET[i].RXbytes));
     }
 
     public_ip(&ip);
     if (!strcmp(ip.PREV, ip.BUFFER) || !strlen(ip.PREV))
       fprintf(stdout, "%s%s", SEPERATOR, ip.BUFFER);
     else
-      fprintf(stdout, "%s%s%s%s", SEPERATOR, ip.PREV, "->", ip.BUFFER);
+      fprintf(stdout, "%s%s%s%s", SEPERATOR, ip.PREV, RIGHT_ARROW, ip.BUFFER);
 
     read_file(&ac_state, ac_cb, ACPI_ACSTATE);
     if (ac_state)
@@ -566,7 +560,7 @@ int main(int argc, char **argv)
     }
 
     snd(SND);
-    fprintf(stdout, "%s%s%s", SEPERATOR, "~~", SND);
+    fprintf(stdout, "%s%s%s", SEPERATOR, SNDSYM, SND);
     date(TIME, sizeof TIME);
     fprintf(stdout, "%s%s\n", SEPERATOR, TIME);
     // Wait

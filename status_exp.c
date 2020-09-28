@@ -91,7 +91,7 @@ typedef struct
 typedef struct
 {
   char IFNAME[8], ESSID[32];
-  unsigned int link;
+  unsigned link;
   net_t *net;
 } wireless_t;
 
@@ -206,7 +206,7 @@ static char *format_units(float val)
 
   return STRING;
 }
-
+/*
 static void read_file(void *data, void (*cb)(), const char FILENAME[])
 {
   FILE *fp = fopen(FILENAME, "r");
@@ -371,7 +371,6 @@ static void wireless_cb(void *data, const char LINE[])
 {
   wireless_t *wireless = data, tmp;
   sscanf(LINE, "%s %*[^ ] %d", tmp.IFNAME, &tmp.link);
-
   if (strncmp(tmp.IFNAME, wireless->net->netif, strlen(wireless->net->netif)) == 0)
   {
     strncpy(wireless->IFNAME, tmp.IFNAME, strlen(wireless->net->netif));
@@ -495,8 +494,8 @@ static void cpu_cb(void *data, const char LINE[])
 
   else if (sscanf(LINE, "processor : %d", &tmp.processor) == 1)
     cpu->processor = tmp.processor;
-  else if (sscanf(LINE, "cpu MHz : %f", &tmp.mhz) == 1)
-    /* Calculate the rolling average wrt number of cores */
+  else if (sscanf(LINE, "cpu MHz : %f", &tmp.mhz) == 1)*/
+    /* Calculate the rolling average wrt number of cores *//*
     cpu->mhz = (cpu->mhz * (cpu->processor) + tmp.mhz) / (cpu->processor + 1);
 }
 
@@ -547,7 +546,7 @@ void set_quit_flag(const int signo)
   (void) signo;
   quit = 1;
 }
-
+*/
 int main(int argc, char **argv)
 {
   (void) argc;
@@ -572,7 +571,7 @@ int main(int argc, char **argv)
   bool ac_state = 0;
   batteries_t batteries;
   init_batteries(&batteries);
-  char SSID[16] = { }, SND[16], TIME[16];
+  char SSID[16] = { }, SND[16], TIME[32];
 
   while (!quit)
   {
