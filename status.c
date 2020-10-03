@@ -157,19 +157,14 @@ static void read_dir(void *data, void (*cb)(), const char DIRNAME[])
 }
 
 static char *format_units(float val)
-{
-  /* Function expects numeric to be in kB units */
+{ /* Function expects numeric to be in kB units */
   static char STRING[8];
-
   if (val * kB < kB)
     sprintf(STRING, "%.0fB", val * kB);
-
   else if (val * kB > kB - 1 && val * kB < mB)
     sprintf(STRING, "%.0fK", val);
-
   else if (val * kB > mB - 1 && val * kB < gB)
     sprintf(STRING, "%.1fM", val / kB);
-
   else if (val * kB > gB - 1)
     sprintf(STRING, "%.1fG", val / mB);
 
@@ -248,18 +243,7 @@ static void battery_info_cb(void *data, const char STRING[])
   if (sscanf(STRING, "design capacity: %d", &tmp.capacity))
     battery->capacity = tmp.capacity;
 }
-/*
-static void battery_cb(void *data, const char STRING[])
-{
-  batteries_t *batteries = data;
-  unsigned *NBAT = &batteries->NBAT;
-  if (strlen(STRING))
-  {
-    strcpy(batteries->BATTERY[*NBAT].BAT, STRING);
-    (*NBAT)++;
-  }
-}
-*/
+
 static void init_batteries(batteries_t *batteries)
 {
   batteries->NBAT = 0;
@@ -276,12 +260,8 @@ static void init_batteries(batteries_t *batteries)
 static void ac_cb(void *data, const char STRING[])
 {
   bool *ac_state = data;
-  char STATE[16];
-  sscanf(STRING, "state: %s", STATE);
-  if (strcmp(STATE, "on-line") == 0)
+  if (!strcmp("state: on-line", STRING))
     *ac_state = 1;
-  else
-    *ac_state = 0;
 }
 #else
 static void battery_state_cb(void *data, const char STRING[])
@@ -598,16 +578,16 @@ int main(int argc, char **argv)
       fprintf(stdout, "%s%s", SEPERATOR, ip.BUFFER);
     else
       fprintf(stdout, "%s%s%s%s", SEPERATOR, ip.PREV, RIGHT_ARROW, ip.BUFFER);
+    
+    ac_state = 0;
+    interval = UPDATE_INTV_ON_BATTERY;
 #ifdef PROC_ACPI
     read_file(&ac_state, ac_cb, ACPI_ACSTATE);
 #else
-    ac_state = 0;
     read_file(&ac_state, ac_cb, SYS_ACSTATE);
 #endif
     if (ac_state)
       interval = UPDATE_INTV;
-    else
-      interval = UPDATE_INTV_ON_BATTERY;
     
     for (unsigned i = 0; i < batteries.NBAT; i++)
     {
