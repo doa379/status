@@ -22,7 +22,7 @@
 #define ACPI_ACSTATE "/proc/acpi/ac_adapter/AC/state"
 #define ACPI_BAT "/proc/acpi/battery"
 #define SYS_PS "/sys/class/power_supply"
-#define SYS_ACSTATE "/sys/class/power_supply/AC/uevent"
+#define SYS_ACSTATE "/sys/class/power_supply/AC/online"
 /* #define PROC_ACPI */
 #define SND_CMD "fuser -v /dev/snd/* 2>&1 /dev/zero"
 #define kB			1024
@@ -262,6 +262,8 @@ static void ac_cb(void *data, const char STRING[])
   bool *ac_state = data;
   if (!strcmp("state: on-line", STRING))
     *ac_state = 1;
+  else
+    *ac_online = 0;
 }
 #else
 static void battery_state_cb(void *data, const char STRING[])
@@ -289,8 +291,9 @@ static void init_batteries(batteries_t *batteries)
 static void ac_cb(void *data, const char STRING[])
 {
   bool *ac_state = data;
-  if (strcmp(STRING, "POWER_SUPPLY_ONLINE=1") == 0)
-    *ac_state = 1;
+  unsigned val;
+  sscanf(STRING, "%d", &val);
+  *ac_state = !val;
 }
 #endif
 static void public_ip(ip_t *ip)
@@ -579,16 +582,11 @@ int main(int argc, char **argv)
     else
       fprintf(stdout, "%s%s%s%s", SEPERATOR, ip.PREV, RIGHT_ARROW, ip.BUFFER);
     
-    ac_state = 0;
-    interval = UPDATE_INTV_ON_BATTERY;
 #ifdef PROC_ACPI
     read_file(&ac_state, ac_cb, ACPI_ACSTATE);
 #else
     read_file(&ac_state, ac_cb, SYS_ACSTATE);
 #endif
-    if (ac_state)
-      interval = UPDATE_INTV;
-    
     for (unsigned i = 0; i < batteries.NBAT; i++)
     {
       read_file(&batteries.BATTERY[i], battery_state_cb, batteries.BATTERY[i].STATEFILE);
@@ -603,6 +601,7 @@ int main(int argc, char **argv)
     date(TIME, sizeof TIME);
     fprintf(stdout, "%s%s\n", SEPERATOR, TIME);
     // Wait
+    interval = ac_state ? UPDATE_INTV : UPDATE_INTV_ON_BATTERY;
     tv.tv_sec = interval;
     tv.tv_usec = 0;
     select(0, NULL, NULL, NULL, &tv);
