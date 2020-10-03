@@ -1,6 +1,6 @@
 #define	STRLEN			1024
-#define UPDATE_INTV_ON_BATTERY 	1
-#define UPDATE_INTV		1
+#define UPDATE_INTV_ON_BATTERY 	5
+#define UPDATE_INTV		30
 #define MAX_BATTERIES 2
 
 static const char *BLKDEV[] = { "nvme0n1" };

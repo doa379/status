@@ -21,6 +21,9 @@
 #define WIRELESS "/proc/net/wireless"
 #define ACPI_ACSTATE "/proc/acpi/ac_adapter/AC/state"
 #define ACPI_BAT "/proc/acpi/battery"
+#define SYS_PS "/sys/class/power_supply"
+#define SYS_ACSTATE "/sys/class/power_supply/AC/uevent"
+/* #define PROC_ACPI */
 #define SND_CMD "fuser -v /dev/snd/* 2>&1 /dev/zero"
 #define kB			1024
 #define mB			(kB * kB)
@@ -112,9 +115,9 @@ typedef struct
 {
   unsigned capacity,
            remaining,
-           rate;
-  char BAT[8], STATE[16], STATEFILE[32];
-  float perc;
+           rate, 
+           perc;
+  char BAT[8], STATEFILE[48], state;
 } battery_t;
 
 typedef struct
@@ -173,82 +176,6 @@ static char *format_units(float val)
   return STRING;
 }
 
-static void date(char TIME[], size_t size)
-{
-  time_t t = time(NULL);
-  strftime(TIME , size, "%l:%M %a %d %b", localtime(&t));
-}
-
-static void battery_state_cb(void *data, const char STRING[])
-{
-  battery_t *battery = data, tmp;
-  if (sscanf(STRING, "charging state: %s", tmp.STATE))
-    strcpy(battery->STATE, tmp.STATE);
-  else if (sscanf(STRING, "present rate: %d", &tmp.rate))
-    battery->rate = tmp.rate;
-  else if (sscanf(STRING, "remaining capacity: %d", &tmp.remaining))
-  {
-    battery->remaining = tmp.remaining;
-    battery->perc = (float) battery->remaining / battery->capacity * 100;
-  }
-}
-
-static void snd(char SND[])
-{
-  FILE *fp = popen(SND_CMD, "r");
-  if (!fp)
-    return;
-
-  char STRING[128];
-  if (fgets(STRING, 128, fp) && fgets(STRING, 128, fp))
-    sscanf(STRING, "%*[^ ] %*[^ ] %*[^ ] %*[^ ] %s", SND);
-  else SND[0] = '\0';
-  pclose(fp);
-}
-
-static void battery_info_cb(void *data, const char STRING[])
-{
-  battery_t *battery = data, tmp;
-  if (sscanf(STRING, "design capacity: %d", &tmp.capacity))
-    battery->capacity = tmp.capacity;
-}
-
-static void battery_cb(void *data, const char STRING[])
-{
-  batteries_t *batteries = data;
-  unsigned *NBAT = &batteries->NBAT;
-  if (strlen(STRING))
-  {
-    strcpy(batteries->BATTERY[*NBAT].BAT, STRING);
-    (*NBAT)++;
-  }
-}
-
-static void init_batteries(batteries_t *batteries)
-{
-  batteries->NBAT = 0;
-  read_dir(batteries, battery_cb, ACPI_BAT); 
-  for (unsigned i = 0; i < batteries->NBAT; i++)
-  {
-    char INFOFILE[32], *bat = batteries->BATTERY[i].BAT;
-    sprintf(INFOFILE, "%s/%s/info", ACPI_BAT, bat);
-    read_file(&batteries->BATTERY[i], battery_info_cb, INFOFILE);
-    sprintf(batteries->BATTERY[i].STATEFILE, "%s/%s/state", ACPI_BAT, bat);
-  }
-}
-
-static void ac_cb(void *data, const char STRING[])
-{
-  bool *ac_state = data;
-  char STATE[16];
-  sscanf(STRING, "state: %s", STATE);
-
-  if (strcmp(STATE, "on-line") == 0)
-    *ac_state = 1;
-  else
-    *ac_state = 0;
-}
-
 static void tail(char LINE[], size_t size, const char FILENAME[], unsigned char n)
 {
   FILE *fp = fopen(FILENAME, "r");
@@ -270,6 +197,122 @@ static void tail(char LINE[], size_t size, const char FILENAME[], unsigned char 
   fclose(fp);
 }
 
+static void date(char TIME[], size_t size)
+{
+  time_t t = time(NULL);
+  strftime(TIME , size, "%l:%M %a %d %b", localtime(&t));
+}
+
+static void snd(char SND[])
+{
+  FILE *fp = popen(SND_CMD, "r");
+  if (!fp)
+    return;
+
+  char STRING[128];
+  if (fgets(STRING, 128, fp) && fgets(STRING, 128, fp))
+    sscanf(STRING, "%*[^ ] %*[^ ] %*[^ ] %*[^ ] %s", SND);
+  else SND[0] = '\0';
+  pclose(fp);
+}
+
+static void battery_cb(void *data, const char STRING[])
+{
+  batteries_t *batteries = data;
+  unsigned *NBAT = &batteries->NBAT;
+  if (!strncmp("BAT", STRING, 3))
+  {
+    strcpy(batteries->BATTERY[*NBAT].BAT, STRING);
+    (*NBAT)++;
+  }
+}
+
+#ifdef PROC_ACPI
+static void battery_state_cb(void *data, const char STRING[])
+{
+  battery_t *battery = data, tmp;
+  if (sscanf(STRING, "charging state: %s", tmp.STATE))
+    strcpy(battery->STATE, tmp.STATE);
+  else if (sscanf(STRING, "present rate: %d", &tmp.rate))
+    battery->rate = tmp.rate;
+  else if (sscanf(STRING, "remaining capacity: %d", &tmp.remaining))
+  {
+    battery->remaining = tmp.remaining;
+    battery->perc = (float) battery->remaining / battery->capacity * 100;
+  }
+}
+
+static void battery_info_cb(void *data, const char STRING[])
+{
+  battery_t *battery = data, tmp;
+  if (sscanf(STRING, "design capacity: %d", &tmp.capacity))
+    battery->capacity = tmp.capacity;
+}
+/*
+static void battery_cb(void *data, const char STRING[])
+{
+  batteries_t *batteries = data;
+  unsigned *NBAT = &batteries->NBAT;
+  if (strlen(STRING))
+  {
+    strcpy(batteries->BATTERY[*NBAT].BAT, STRING);
+    (*NBAT)++;
+  }
+}
+*/
+static void init_batteries(batteries_t *batteries)
+{
+  batteries->NBAT = 0;
+  read_dir(batteries, battery_cb, ACPI_BAT); 
+  for (unsigned i = 0; i < batteries->NBAT; i++)
+  {
+    char INFOFILE[32], *bat = batteries->BATTERY[i].BAT;
+    sprintf(INFOFILE, "%s/%s/info", ACPI_BAT, bat);
+    read_file(&batteries->BATTERY[i], battery_info_cb, INFOFILE);
+    sprintf(batteries->BATTERY[i].STATEFILE, "%s/%s/state", ACPI_BAT, bat);
+  }
+}
+
+static void ac_cb(void *data, const char STRING[])
+{
+  bool *ac_state = data;
+  char STATE[16];
+  sscanf(STRING, "state: %s", STATE);
+  if (strcmp(STATE, "on-line") == 0)
+    *ac_state = 1;
+  else
+    *ac_state = 0;
+}
+#else
+static void battery_state_cb(void *data, const char STRING[])
+{
+  battery_t *battery = data, tmp;
+  if (sscanf(STRING, "POWER_SUPPLY_STATUS=%c", &tmp.state))
+    battery->state = tmp.state > 96 ? tmp.state - 32 : tmp.state;
+  else if (sscanf(STRING, "POWER_SUPPLY_CURRENT_NOW=%d", &tmp.rate))
+    battery->rate = tmp.rate;
+  else if (sscanf(STRING, "POWER_SUPPLY_CAPACITY=%d", &tmp.perc))
+    battery->perc = tmp.perc;
+}
+
+static void init_batteries(batteries_t *batteries)
+{
+  batteries->NBAT = 0;
+  read_dir(batteries, battery_cb, SYS_PS); 
+  for (unsigned i = 0; i < batteries->NBAT; i++)
+  {
+    char *bat = batteries->BATTERY[i].BAT;
+    sprintf(batteries->BATTERY[i].STATEFILE, "%s/%s/uevent", SYS_PS, bat);
+  }
+}
+
+static void ac_cb(void *data, const char STRING[])
+{
+  bool *ac_state = data;
+  if (strcmp(STRING, "POWER_SUPPLY_ONLINE=1") == 0)
+    *ac_state = 1;
+}
+#endif
 static void public_ip(ip_t *ip)
 {
   char SWAP[64];
@@ -510,7 +553,7 @@ int main(int argc, char **argv)
   init_net(NET, WLAN);
   ip_t ip;
   init_ip(&ip);
-  bool ac_state = 0;
+  bool ac_state;
   batteries_t batteries;
   init_batteries(&batteries);
   char SND[16], TIME[32];
@@ -555,22 +598,26 @@ int main(int argc, char **argv)
       fprintf(stdout, "%s%s", SEPERATOR, ip.BUFFER);
     else
       fprintf(stdout, "%s%s%s%s", SEPERATOR, ip.PREV, RIGHT_ARROW, ip.BUFFER);
-
+#ifdef PROC_ACPI
     read_file(&ac_state, ac_cb, ACPI_ACSTATE);
+#else
+    ac_state = 0;
+    read_file(&ac_state, ac_cb, SYS_ACSTATE);
+#endif
     if (ac_state)
       interval = UPDATE_INTV;
     else
       interval = UPDATE_INTV_ON_BATTERY;
-
+    
     for (unsigned i = 0; i < batteries.NBAT; i++)
     {
       read_file(&batteries.BATTERY[i], battery_state_cb, batteries.BATTERY[i].STATEFILE);
-      fprintf(stdout, "%s%s %.0f%% %c", SEPERATOR, 
+      fprintf(stdout, "%s%s %d%% %c", SEPERATOR, 
           batteries.BATTERY[i].BAT, 
           batteries.BATTERY[i].perc, 
-          batteries.BATTERY[i].STATE[0] - 32);
+          batteries.BATTERY[i].state);
     }
-
+    
     snd(SND);
     fprintf(stdout, "%s%s%s", SEPERATOR, SNDSYM, SND);
     date(TIME, sizeof TIME);
