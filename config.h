@@ -2,6 +2,7 @@
 #define UPDATE_INTV_ON_BATTERY 	5
 #define UPDATE_INTV		30
 #define MAX_BATTERIES 2
+/* #define PROC_ACPI */
 
 static const char *BLKDEV[] = { "nvme0n1" };
 static const char *DIRECTORY[] = { "/", "/tmp" };

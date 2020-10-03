@@ -23,7 +23,6 @@
 #define ACPI_BAT "/proc/acpi/battery"
 #define SYS_PS "/sys/class/power_supply"
 #define SYS_ACSTATE "/sys/class/power_supply/AC/online"
-/* #define PROC_ACPI */
 #define SND_CMD "fuser -v /dev/snd/* 2>&1 /dev/zero"
 #define kB			1024
 #define mB			(kB * kB)
@@ -581,7 +580,6 @@ int main(int argc, char **argv)
       fprintf(stdout, "%s%s", SEPERATOR, ip.BUFFER);
     else
       fprintf(stdout, "%s%s%s%s", SEPERATOR, ip.PREV, RIGHT_ARROW, ip.BUFFER);
-    
 #ifdef PROC_ACPI
     read_file(&ac_state, ac_cb, ACPI_ACSTATE);
 #else
