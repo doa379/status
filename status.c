@@ -8,7 +8,11 @@
 #include <dirent.h>
 #include <sys/statvfs.h>
 #include <sys/ioctl.h>
+#include <sys/poll.h>
 #include <linux/wireless.h>
+#include <linux/input.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <curl/curl.h>
 #include "config.h"
 
@@ -24,28 +28,12 @@
 #define SYS_PS "/sys/class/power_supply"
 #define SYS_ACSTATE "/sys/class/power_supply/AC/online"
 #define SND_CMD "fuser -v /dev/snd/* 2>&1 /dev/zero"
+#define DEVICES "/proc/bus/input/devices"
+#define MAX_NFD 4
+#define DEVICE_TYPES "Keyboard", "keyboard", "Lid", "Sleep", "Power"
 #define kB			1024
 #define mB			(kB * kB)
 #define gB			(kB * mB)
-#define UP_ARROW                "\u2b06"
-#define DOWN_ARROW		          "\u2b07"
-#define UP_TRI                  "\u25b4"
-#define DOWN_TRI                "\u25be"
-#define RIGHT_ARROW		          "\u27a1"
-#define FULL_SPACE		          "\u2000"
-#define SHORT_SPACE		          "\u2005"
-#define HEAVY_HORIZONTAL        "\u2501"
-#define HEAVY_VERTICAL		      "\u2503"
-#define DOUBLE_VERTICAL		      "\u2551"
-#define LF_THREE_EIGHTHS_BLOCK	" \u258d"
-#define LIGHT_SHADE		          "\u2591"
-#define MEDIUM_SHADE		        " \u2592 "
-#define DARK_SHADE		          " \u2593 "
-#define DASH_VERT               "\u250a"
-#define UP                      UP_TRI
-#define DOWN                    DOWN_TRI
-#define SNDSYM                  "♬"
-#define SEPERATOR		            "|"
 
 typedef struct
 {
@@ -121,12 +109,20 @@ typedef struct
 
 typedef struct
 {
-  unsigned NBAT;
+  unsigned NBAT, total_perc;
   battery_t BATTERY[MAX_BATTERIES];
 } batteries_t;
 
+typedef struct
+{
+  unsigned nfd, count;
+  char DEV[MAX_NFD][32];
+  struct pollfd PFD[MAX_NFD];
+} device_t;
+
 static unsigned char interval = UPDATE_INTV;
 static bool quit = 0;
+const char *SEARCH_TERMS[] = { DEVICE_TYPES };
 
 static void read_file(void *data, void (*cb)(), const char FILENAME[])
 {
@@ -189,6 +185,45 @@ static void tail(char LINE[], size_t size, const char FILENAME[], unsigned char 
   if (fgets(LINE, size, fp))
     LINE[strlen(LINE) - 1] = '\0';
   fclose(fp);
+}
+
+static void parse_dev_cb(void *data, char LINE[])
+{
+  device_t *device = data;
+  if (!strncmp("N:", LINE, 2))
+  {
+    for (unsigned i = 0; i < LENGTH(SEARCH_TERMS); i++)
+      if (strstr(LINE, SEARCH_TERMS[i]))
+        device->nfd++;
+  }
+
+  else if (!strncmp("H:", LINE, 2) && device->count < device->nfd)
+  {
+    char *p;
+    if ((p = strstr(LINE, "event")))
+    {
+      char EV[7];
+      sscanf(p, "%s", EV);
+      sprintf(device->DEV[device->nfd - 1], "/dev/input/%s", EV);
+      device->count++;
+    }
+  }
+}
+
+static void deinit_device(device_t *device)
+{
+  for (unsigned i = 0; i < device->nfd; i++)
+    close(device->PFD[i].fd);
+}
+
+static void init_device(device_t *device)
+{
+  read_file(device, parse_dev_cb, DEVICES);
+  for (unsigned i = 0; i < device->nfd; i++)
+  {
+    device->PFD[i].fd = open(device->DEV[i], O_RDONLY);
+    device->PFD[i].events = POLLIN;
+  }
 }
 
 static void date(char TIME[], size_t size)
@@ -514,11 +549,10 @@ void set_quit_flag(const int signo)
   quit = 1;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char *argv[])
 {
   (void) argc;
   (void) **argv;
-  struct timeval tv;
   struct sigaction SA;
   memset(&SA, 0, sizeof SA);
   SA.sa_handler = set_quit_flag;
@@ -539,6 +573,9 @@ int main(int argc, char **argv)
   batteries_t batteries;
   init_batteries(&batteries);
   char SND[16], TIME[32];
+  device_t device = { };
+  init_device(&device);
+  struct input_event evt;
 
   while (!quit)
   {
@@ -585,6 +622,7 @@ int main(int argc, char **argv)
 #else
     read_file(&ac_state, ac_cb, SYS_ACSTATE);
 #endif
+    batteries.total_perc = 0;
     for (unsigned i = 0; i < batteries.NBAT; i++)
     {
       read_file(&batteries.BATTERY[i], battery_state_cb, batteries.BATTERY[i].STATEFILE);
@@ -592,6 +630,13 @@ int main(int argc, char **argv)
           batteries.BATTERY[i].BAT, 
           batteries.BATTERY[i].perc, 
           batteries.BATTERY[i].state);
+      batteries.total_perc += batteries.BATTERY[i].perc;
+    }
+
+    if ((float) batteries.total_perc / batteries.NBAT < SUSPEND_THRESHOLD_PERC)
+    {
+      system(SUSPEND_CMD);
+      system(LOCKALL_CMD);
     }
     
     snd(SND);
@@ -599,12 +644,35 @@ int main(int argc, char **argv)
     date(TIME, sizeof TIME);
     fprintf(stdout, "%s%s\n", SEPERATOR, TIME);
     // Wait
-    interval = ac_state ? UPDATE_INTV : UPDATE_INTV_ON_BATTERY;
-    tv.tv_sec = interval;
-    tv.tv_usec = 0;
-    select(0, NULL, NULL, NULL, &tv);
+    interval = ac_state ? UPDATE_INTV_ON_BATTERY : UPDATE_INTV;
+    poll(device.PFD, device.nfd, interval * 1000);
+    for (unsigned i = 0; i < device.nfd; i++)
+      if (device.PFD[i].revents & POLLIN)
+      {
+        read(device.PFD[i].fd, &evt, sizeof evt);
+        if (!evt.value);
+        else if (evt.type == EV_SW && evt.code == SW_LID)
+          system(LOCKALL_CMD);
+        else if (evt.type == EV_KEY && evt.code == KEY_BRIGHTNESSUP)
+          system(BRIGHTNESSUP_CMD);
+        else if (evt.type == EV_KEY && evt.code == KEY_BRIGHTNESSDOWN)
+          system(BRIGHTNESSDOWN_CMD);
+        else if (evt.type == EV_KEY && evt.code == KEY_SWITCHVIDEOMODE)
+          system(SWITCHDISPLAY_CMD);
+        else if (evt.type == EV_KEY && evt.code == KEY_MUTE)
+          system(VOLUMEMUTE_CMD);
+        else if (evt.type == EV_KEY && evt.code == KEY_VOLUMEUP)
+          system(VOLUMEUP_CMD);
+        else if (evt.type == EV_KEY && evt.code == KEY_VOLUMEDOWN)
+          system(VOLUMEDOWN_CMD);
+        else if (evt.type == EV_KEY && evt.code == KEY_SLEEP)
+          system(SLEEP_CMD);
+        else if (evt.type == EV_KEY && evt.code == KEY_POWER)
+          system(SUSPEND_CMD);
+      }
   }
 
+  deinit_device(&device);
   deinit_ip(&ip);
   return 0;
 }
