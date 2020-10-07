@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <curl/curl.h>
+#include <time.h>
 #include "config.h"
 
 #define LENGTH(X)		(sizeof X / sizeof X[0])
@@ -576,6 +577,9 @@ int main(int argc, char *argv[])
   device_t device = { };
   init_device(&device);
   struct input_event evt;
+  time_t start, now;
+  float time_diff;
+  unsigned poll_interval;
 
   while (!quit)
   {
@@ -643,9 +647,12 @@ int main(int argc, char *argv[])
     fprintf(stdout, "%s%s%s", SEPERATOR, SNDSYM, SND);
     date(TIME, sizeof TIME);
     fprintf(stdout, "%s%s\n", SEPERATOR, TIME);
-    // Wait
+    /* Wait */
     interval = ac_state ? UPDATE_INTV_ON_BATTERY : UPDATE_INTV;
-    poll(device.PFD, device.NFD, interval * 1000);
+    poll_interval = interval;
+    time(&start);
+    poll_resume:
+    poll(device.PFD, device.NFD, poll_interval * 1000);
     for (unsigned i = 0; i < device.NFD; i++)
       if (device.PFD[i].revents & POLLIN && 
         read(device.PFD[i].fd, &evt, sizeof evt) > 0)
@@ -675,7 +682,15 @@ int main(int argc, char *argv[])
           system(SUSPEND_CMD);
           system(LOCKALL_CMD);
         }
-      }
+      } 
+    
+    time(&now);
+    time_diff = difftime(now, start);
+    if (time_diff < interval)
+    {
+      poll_interval = interval - time_diff;
+      goto poll_resume;
+    }
   }
 
   deinit_device(&device);
