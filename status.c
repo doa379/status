@@ -115,7 +115,7 @@ typedef struct
 
 typedef struct
 {
-  unsigned nfd, count;
+  unsigned NFD, count;
   char DEV[MAX_NFD][32];
   struct pollfd PFD[MAX_NFD];
 } device_t;
@@ -194,17 +194,17 @@ static void parse_dev_cb(void *data, char LINE[])
   {
     for (unsigned i = 0; i < LENGTH(SEARCH_TERMS); i++)
       if (strstr(LINE, SEARCH_TERMS[i]))
-        device->nfd++;
+        device->NFD++;
   }
 
-  else if (!strncmp("H:", LINE, 2) && device->count < device->nfd)
+  else if (!strncmp("H:", LINE, 2) && device->count < device->NFD)
   {
     char *p;
     if ((p = strstr(LINE, "event")))
     {
       char EV[7];
       sscanf(p, "%s", EV);
-      sprintf(device->DEV[device->nfd - 1], "/dev/input/%s", EV);
+      sprintf(device->DEV[device->NFD - 1], "/dev/input/%s", EV);
       device->count++;
     }
   }
@@ -212,14 +212,14 @@ static void parse_dev_cb(void *data, char LINE[])
 
 static void deinit_device(device_t *device)
 {
-  for (unsigned i = 0; i < device->nfd; i++)
+  for (unsigned i = 0; i < device->NFD; i++)
     close(device->PFD[i].fd);
 }
 
 static void init_device(device_t *device)
 {
   read_file(device, parse_dev_cb, DEVICES);
-  for (unsigned i = 0; i < device->nfd; i++)
+  for (unsigned i = 0; i < device->NFD; i++)
   {
     device->PFD[i].fd = open(device->DEV[i], O_RDONLY);
     device->PFD[i].events = POLLIN;
@@ -645,11 +645,11 @@ int main(int argc, char *argv[])
     fprintf(stdout, "%s%s\n", SEPERATOR, TIME);
     // Wait
     interval = ac_state ? UPDATE_INTV_ON_BATTERY : UPDATE_INTV;
-    poll(device.PFD, device.nfd, interval * 1000);
-    for (unsigned i = 0; i < device.nfd; i++)
-      if (device.PFD[i].revents & POLLIN)
+    poll(device.PFD, device.NFD, interval * 1000);
+    for (unsigned i = 0; i < device.NFD; i++)
+      if (device.PFD[i].revents & POLLIN && 
+        read(device.PFD[i].fd, &evt, sizeof evt) > 0)
       {
-        read(device.PFD[i].fd, &evt, sizeof evt);
         if (!evt.value);
         else if (evt.type == EV_SW && evt.code == SW_LID)
           system(LOCKALL_CMD);
@@ -666,9 +666,15 @@ int main(int argc, char *argv[])
         else if (evt.type == EV_KEY && evt.code == KEY_VOLUMEDOWN)
           system(VOLUMEDOWN_CMD);
         else if (evt.type == EV_KEY && evt.code == KEY_SLEEP)
+        {
           system(SLEEP_CMD);
+          system(LOCKALL_CMD);
+        }
         else if (evt.type == EV_KEY && evt.code == KEY_POWER)
+        {
           system(SUSPEND_CMD);
+          system(LOCKALL_CMD);
+        }
       }
   }
 

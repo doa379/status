@@ -11,8 +11,8 @@
 #define VOLUMEMUTE_CMD "vol 0"
 #define VOLUMEUP_CMD "vol +"
 #define VOLUMEDOWN_CMD "vol -"
-#define BRIGHTNESSUP_CMD "sudo backlight +"
-#define BRIGHTNESSDOWN_CMD "sudo backlight -"
+#define BRIGHTNESSUP_CMD "sudo /usr/local/bin/backlight +"
+#define BRIGHTNESSDOWN_CMD "sudo /usr/local/bin/backlight -"
 #define LOCKALL_CMD "lockall"
 #define UP_ARROW                "\u2b06"
 #define DOWN_ARROW		          "\u2b07"
@@ -34,10 +34,9 @@
 #define SNDSYM                  "♬"
 #define SEPERATOR		            "|"
 
-
 static const char *BLKDEV[] = { "nvme0n1", /*"nvme0n1"*/ };
 static const char *DIRECTORY[] = { "/", "/tmp" };
-static const char *NETIF[] = { "eth0", "wlan0", "wlan1", /*"wlan2"*/ };
+static const char *NETIF[] = { "eth0", "wlan0", /*"wlan1", "wlan2"*/ };
 static const char *IPLIST = "/tmp/iplist";
 static const char *IPURL[] = {
 	"http://whatismyip.akamai.com",
