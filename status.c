@@ -344,8 +344,7 @@ static void public_ip(ip_t *ip)
     strcpy(ip->BUFFER, "No IP");
     return;
   }
-  else if (strcmp(ip->BUFFER, ip->PREV) &&
-    strcmp("No IP", ip->BUFFER))
+  else if (strcmp(ip->BUFFER, ip->PREV))
   {
     FILE *fp = fopen(IPLIST, "a+");
     if (!fp)
