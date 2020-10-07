@@ -577,7 +577,7 @@ int main(int argc, char *argv[])
   device_t device = { };
   init_device(&device);
   struct input_event evt;
-  time_t start, now;
+  time_t init, now;
   float time_diff;
   unsigned poll_interval;
 
@@ -650,7 +650,7 @@ int main(int argc, char *argv[])
     /* Wait */
     interval = ac_state ? UPDATE_INTV_ON_BATTERY : UPDATE_INTV;
     poll_interval = interval;
-    time(&start);
+    time(&init);
     poll_resume:
     poll(device.PFD, device.NFD, poll_interval * 1000);
     for (unsigned i = 0; i < device.NFD; i++)
@@ -685,7 +685,7 @@ int main(int argc, char *argv[])
       } 
     
     time(&now);
-    time_diff = difftime(now, start);
+    time_diff = difftime(now, init);
     if (time_diff < interval)
     {
       poll_interval = interval - time_diff;
