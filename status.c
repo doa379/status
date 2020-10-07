@@ -1,3 +1,7 @@
+/* See LICENSE file for license details.
+ * Copyright 2017-2020 by doa379
+ */
+
 #include <stdbool.h>
 #include <locale.h>
 #include <signal.h>
