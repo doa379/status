@@ -32,7 +32,7 @@
 #define UP                      UP_TRI
 #define DOWN                    DOWN_TRI
 #define SNDSYM                  "♬"
-#define SEPERATOR		            "|"
+#define DELIM		                "|"
 
 static const char *BLKDEV[] = { "nvme0n1", /*"nvme0n1"*/ };
 static const char *DIRECTORY[] = { "/", "/tmp" };

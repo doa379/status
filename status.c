@@ -591,17 +591,17 @@ int main(int argc, char *argv[])
     read_file(&cpu, cpu_cb, STAT);
     read_file(&mem, mem_cb, MEM);
     fprintf(stdout, "%.0lf%% %.0fMHz", cpu.perc, cpu.mhz);
-    fprintf(stdout, "%s%.0f%% (%s)", SEPERATOR, mem.perc, format_units(mem.swap));
+    fprintf(stdout, "%s%.0f%% (%s)", DELIM, mem.perc, format_units(mem.swap));
     
     for (unsigned i = 0; i < LENGTH(BLKDEV); i++)
     {
       read_file(&DISKSTATS[i], blkdev_cb, DISKSTAT);
-      fprintf(stdout, "%s%s ", SEPERATOR, BLKDEV[i]);
+      fprintf(stdout, "%s%s ", DELIM, BLKDEV[i]);
       fprintf(stdout, "%s%s", UP, format_units(DISKSTATS[i].readkbs));
       fprintf(stdout, "%s%s", DOWN, format_units(DISKSTATS[i].writekbs));
     }
     
-    fprintf(stdout, "%s", SEPERATOR);
+    fprintf(stdout, "%s", DELIM);
     for (unsigned i = 0; i < LENGTH(DIRECTORY); i++)
       fprintf(stdout, "%s %u%% ", DIRECTORY[i], du_perc(DIRECTORY[i]));
 
@@ -609,7 +609,7 @@ int main(int argc, char *argv[])
     {
       read_file(&NET[i], net_cb, NET_ADAPTERS);
       read_file(&WLAN[i], wireless_cb, WIRELESS);
-      fprintf(stdout, "%s%s ", SEPERATOR, NET[i].netif);
+      fprintf(stdout, "%s%s ", DELIM, NET[i].netif);
       ssid(&WLAN[i].ssid);
       if (strlen(WLAN[i].ssid.SSID))
         fprintf(stdout, "%s %d%% ", WLAN[i].ssid.SSID, wireless_link(&WLAN[i]));
@@ -622,9 +622,9 @@ int main(int argc, char *argv[])
 
     public_ip(&ip);
     if (!strcmp(ip.PREV, ip.BUFFER) || !strlen(ip.PREV))
-      fprintf(stdout, "%s%s", SEPERATOR, ip.BUFFER);
+      fprintf(stdout, "%s%s", DELIM, ip.BUFFER);
     else
-      fprintf(stdout, "%s%s%s%s", SEPERATOR, ip.PREV, RIGHT_ARROW, ip.BUFFER);
+      fprintf(stdout, "%s%s%s%s", DELIM, ip.PREV, RIGHT_ARROW, ip.BUFFER);
 #ifdef PROC_ACPI
     read_file(&ac_state, ac_cb, ACPI_ACSTATE);
 #else
@@ -634,7 +634,7 @@ int main(int argc, char *argv[])
     for (unsigned i = 0; i < batteries.NBAT; i++)
     {
       read_file(&batteries.BATTERY[i], battery_state_cb, batteries.BATTERY[i].STATEFILE);
-      fprintf(stdout, "%s%s %d%% %c", SEPERATOR, 
+      fprintf(stdout, "%s%s %d%% %c", DELIM, 
           batteries.BATTERY[i].BAT, 
           batteries.BATTERY[i].perc, 
           batteries.BATTERY[i].state);
@@ -648,9 +648,9 @@ int main(int argc, char *argv[])
     }
     
     snd(SND);
-    fprintf(stdout, "%s%s%s", SEPERATOR, SNDSYM, SND);
+    fprintf(stdout, "%s%s%s", DELIM, SNDSYM, SND);
     date(TIME, sizeof TIME);
-    fprintf(stdout, "%s%s\n", SEPERATOR, TIME);
+    fprintf(stdout, "%s%s\n", DELIM, TIME);
     /* Wait */
     interval = ac_state ? UPDATE_INTV_ON_BATTERY : UPDATE_INTV;
     poll_interval = interval;
@@ -686,15 +686,15 @@ int main(int argc, char *argv[])
           system(SUSPEND_CMD);
           system(LOCKALL_CMD);
         }
-      } 
     
-    time(&now);
-    time_diff = difftime(now, init);
-    if (time_diff < interval)
-    {
-      poll_interval = interval - time_diff;
-      goto poll_resume;
-    }
+        time(&now);
+        time_diff = difftime(now, init);
+        if (time_diff < interval)
+        {
+          poll_interval = interval - time_diff;
+          goto poll_resume;
+        }
+      }
   }
 
   deinit_device(&device);
