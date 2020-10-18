@@ -34,9 +34,9 @@
 #define SNDSYM                  "♬"
 #define DELIM		                "|"
 
-static const char *BLKDEV[] = { "nvme0n1", /*"nvme0n1"*/ };
+static const char *BLKDEV[] = { "sda", /*"nvme0n1"*/ };
 static const char *DIRECTORY[] = { "/", "/tmp" };
-static const char *NETIF[] = { "eth0", "wlan0", /*"wlan1", "wlan2"*/ };
+static const char *NETIF[] = { "eth0", "wlan0", "wlan1", "wlan2" };
 static const char *IPLIST = "/tmp/iplist";
 static const char *IPURL[] = {
 	"http://whatismyip.akamai.com",

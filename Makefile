@@ -1,5 +1,5 @@
 INCS    =
-LIBS    = -l curl -l X11 -l m
+LIBS    = -l curl
 
 SRC     = status.c
 OBJ     = ${SRC:.c=.o}

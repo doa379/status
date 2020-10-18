@@ -234,7 +234,7 @@ static void init_device(device_t *device)
 static void date(char TIME[], size_t size)
 {
   time_t t = time(NULL);
-  strftime(TIME , size, "%l:%M %a %d %b", localtime(&t));
+  strftime(TIME , size, "%R %a %d %b", localtime(&t));
 }
 
 static void snd(char SND[])
@@ -533,7 +533,7 @@ static void init_curl(ip_t *ip)
   curl_easy_setopt(ip->handle, CURLOPT_URL, IPURL[0]);
   curl_easy_setopt(ip->handle, CURLOPT_WRITEFUNCTION, writefunc);
   curl_easy_setopt(ip->handle, CURLOPT_WRITEDATA, ip);
-  curl_easy_setopt(ip->handle, CURLOPT_TIMEOUT, 1L);
+  curl_easy_setopt(ip->handle, CURLOPT_TIMEOUT_MS, 250L);
 }
 
 static void deinit_ip(ip_t *ip)
