@@ -32,7 +32,7 @@
 #define ACPI_BAT "/proc/acpi/battery"
 #define SYS_PS "/sys/class/power_supply"
 #define SYS_ACSTATE "/sys/class/power_supply/AC/online"
-#define SND_CMD "lsof /dev/snd/timer"
+#define SND_CMD "lsof /dev/snd/*"
 #define DEVICES "/proc/bus/input/devices"
 #define MAX_NFD 4
 #define DEVICE_TYPES "Keyboard", "keyboard", "Lid", "Sleep", "Power"
