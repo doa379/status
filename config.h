@@ -32,15 +32,14 @@
 #define UP                      UP_TRI
 #define DOWN                    DOWN_TRI
 #define SNDSYM                  "♬"
+#define PWRSYM                  "⌁"
 #define DELIM		                "|"
-
-static const char *BLKDEV[] = { "sda", /*"nvme0n1"*/ };
-static const char *DIRECTORY[] = { "/", "/tmp" };
-static const char *NETIF[] = { "eth0", "wlan0", "wlan1", "wlan2" };
-static const char *IPLIST = "/tmp/iplist";
-static const char *IPURL[] = {
-	"http://whatismyip.akamai.com",
-	"http://checkip.amazonaws.com",
-	"http://ipinfo.io/ip",
+#define IPLIST                  "/tmp/iplist"
+#define BLKDEVS                 /*"sda",*/ "nvme0n1"
+#define DIRECTORIES             "/", "/tmp"
+#define NETIFS                  "eth0", "wlan0", /*"wlan1", "wlan2"*/
+#define IPURLS                  \
+	"http://whatismyip.akamai.com",\
+	"http://checkip.amazonaws.com",\
+	"http://ipinfo.io/ip",\
 	"http://ipecho.net/plain",
-};
