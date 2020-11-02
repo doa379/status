@@ -31,13 +31,13 @@
 #define DASH_VERT               "\u250a"
 #define UP                      UP_TRI
 #define DOWN                    DOWN_TRI
+#define PWRSYM                  "⚡"
 #define SNDSYM                  "♬"
-#define PWRSYM                  "⌁"
 #define DELIM		                "|"
 #define IPLIST                  "/tmp/iplist"
-#define BLKDEVS                 /*"sda",*/ "nvme0n1"
+#define BLKDEVS                 "sda",/* "nvme0n1"*/
 #define DIRECTORIES             "/", "/tmp"
-#define NETIFS                  "eth0", "wlan0", /*"wlan1", "wlan2"*/
+#define NETIFS                  "eth0", "wlan0", "wlan1", /*"wlan2"*/
 #define IPURLS                  \
 	"http://whatismyip.akamai.com",\
 	"http://checkip.amazonaws.com",\

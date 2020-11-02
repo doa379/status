@@ -123,7 +123,7 @@ unsigned power(void *data, unsigned interval)
   }
   
   pclose(fp);
-  return (*totalenergy_uj - prev) / 10e6 / interval;
+  return (*totalenergy_uj - prev) / 1e6 / interval;
 }
 
 void snd(char SND[])
