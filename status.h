@@ -82,7 +82,7 @@ typedef struct
 typedef struct
 {
   CURL *handle;
-  char BUFFER[64], PREV[64];
+  char BUFFER[64], CURR[64], PREV[64];
 } ip_t;
 
 typedef struct

@@ -225,14 +225,10 @@ void ac_cb(void *data, const char STRING[])
 #endif
 void public_ip(ip_t *ip)
 {
-  char SWAP[64];
-  strcpy(SWAP, ip->BUFFER);
   if (curl_easy_perform(ip->handle) != CURLE_OK)
-  {
-    strcpy(ip->BUFFER, "No IP");
-    return;
-  }
-  else if (strcmp(ip->BUFFER, ip->PREV))
+    strcpy(ip->CURR, "No IP");
+  else if (strcmp(ip->BUFFER, ip->CURR)
+    && strcmp("No IP", ip->CURR))
   {
     FILE *fp = fopen(IPLIST, "a+");
     if (!fp)
@@ -240,7 +236,8 @@ void public_ip(ip_t *ip)
 
     fprintf(fp, "%s\n", ip->BUFFER);
     fclose(fp);
-    strcpy(ip->PREV, SWAP);
+    strcpy(ip->PREV, ip->CURR);
+    strcpy(ip->CURR, ip->BUFFER);
   }
 }
 
@@ -449,6 +446,6 @@ void deinit_ip(ip_t *ip)
 void init_ip(ip_t *ip)
 {
   init_curl(ip);
-  ip->BUFFER[0] = '\0';
-  tail(ip->PREV, sizeof ip->PREV, IPLIST, 1);
+  tail(ip->CURR, sizeof ip->CURR, IPLIST, 1);
+  tail(ip->PREV, sizeof ip->PREV, IPLIST, 2);
 }
