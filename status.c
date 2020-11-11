@@ -156,16 +156,18 @@ void init_power(powercaps_t *powercaps)
   read_dir(powercaps, powercap_cb, ENERGY);
 }
 
+void snd_cb(void *data, const char LINE[])
+{
+  char *snd = data;
+  unsigned pid;
+  if (sscanf(LINE, "  Client application %d : running", &pid))
+    sprintf(snd, "%d", pid);
+}
+
 void snd(char SND[])
 {
-  FILE *fp = popen(SND_CMD, "r");
-  if (!fp)
-    return;
-
-  if (fgets(LINE, sizeof LINE, fp) && fgets(LINE, sizeof LINE, fp))
-    sscanf(LINE, "%s", SND);
-  else SND[0] = '\0';
-  pclose(fp);
+  SND[0] = '\0';
+  read_file(SND, snd_cb, SOUND);
 }
 
 void battery_cb(void *data, const char STRING[])

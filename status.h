@@ -17,7 +17,7 @@
 #define ACPI_BAT "/proc/acpi/battery"
 #define SYS_PS "/sys/class/power_supply"
 #define SYS_ACSTATE "/sys/class/power_supply/AC/online"
-#define SND_CMD "lsof /dev/snd/*"
+#define SOUND "/proc/asound/timers"
 #define DEVICES "/proc/bus/input/devices"
 #define ENERGY "/sys/class/powercap"
 #define kB			1024
