@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <sys/statvfs.h>
 #include <sys/ioctl.h>
+#include <stdlib.h>
 #include "status.h"
 
 static const char *BLKDEV[] = { BLKDEVS };
@@ -108,22 +109,51 @@ void date(char TIME[], size_t size)
   strftime(TIME , size, "%R %a %d %b", localtime(&t));
 }
 
+void energyuj_cb(void *data, const char LINE[])
+{
+  unsigned long energy, *total_energy = data;
+  sscanf(LINE, "%lu", &energy);
+  *total_energy += energy;
+}
+
 unsigned power(void *data, unsigned interval)
 {
-  FILE *fp = popen(ENERGY_CMD, "r");
-  if (!fp)
-    return 0;
+  powercaps_t *powercaps = data;
+  powercaps->prev_energy_uj = powercaps->curr_energy_uj;
+  powercaps->curr_energy_uj = 0;
+  for (unsigned i = 0; i < powercaps->size; i++)
+    read_file(&powercaps->curr_energy_uj, energyuj_cb, powercaps->powercap[i].STATEFILE);
 
-  unsigned long *totalenergy_uj = data, prev = *totalenergy_uj, energy;
-  *totalenergy_uj = 0;
-  while (fgets(LINE, sizeof LINE, fp))
+  return (powercaps->curr_energy_uj - powercaps->prev_energy_uj) / 1e6 / interval;
+}
+
+void powercap_cb(void *data, const char STRING[])
+{
+  powercaps_t *powercaps = data;
+  powercap_t powercap;
+  char FILENAME[sizeof powercap.STATEFILE];
+  sprintf(FILENAME, "%s/%s/energy_uj", ENERGY, STRING);
+  FILE *fp = fopen(FILENAME, "r");
+  if (fp)
   {
-    sscanf(LINE, "%lu", &energy);
-    *totalenergy_uj += energy;
+    powercaps->powercap = realloc(powercaps->powercap, 
+      (powercaps->size + 1) * sizeof powercap);
+    strcpy(powercaps->powercap[powercaps->size].STATEFILE, FILENAME);
+    powercaps->size++;
+    fclose(fp);
   }
-  
-  pclose(fp);
-  return (*totalenergy_uj - prev) / 1e6 / interval;
+}
+
+void deinit_power(powercaps_t *powercaps)
+{
+  free(powercaps->powercap);
+}
+
+void init_power(powercaps_t *powercaps)
+{
+  powercaps->powercap = malloc(1);
+  powercaps->size = 0;
+  read_dir(powercaps, powercap_cb, ENERGY);
 }
 
 void snd(char SND[])
@@ -141,12 +171,18 @@ void snd(char SND[])
 void battery_cb(void *data, const char STRING[])
 {
   batteries_t *batteries = data;
-  unsigned *NBAT = &batteries->NBAT;
   if (!strncmp("BAT", STRING, 3))
   {
-    strcpy(batteries->BATTERY[*NBAT].BAT, STRING);
-    (*NBAT)++;
+    batteries->battery = realloc(batteries->battery, 
+      (batteries->size + 1) * sizeof(battery_t));
+    strcpy(batteries->battery[batteries->size].BAT, STRING);
+    batteries->size++;
   }
+}
+
+void deinit_batteries(batteries_t *batteries)
+{
+  free(batteries->battery);
 }
 
 #ifdef PROC_ACPI
@@ -173,14 +209,15 @@ void battery_info_cb(void *data, const char STRING[])
 
 static void init_batteries(batteries_t *batteries)
 {
-  batteries->NBAT = 0;
-  read_dir(batteries, battery_cb, ACPI_BAT); 
-  for (unsigned i = 0; i < batteries->NBAT; i++)
+  batteries->battery = malloc(1);
+  batteries->size = 0;
+  read_dir(batteries, battery_cb, ACPI_BAT);
+  for (unsigned i = 0; i < batteries->size; i++)
   {
-    char INFOFILE[32], *bat = batteries->BATTERY[i].BAT;
+    char INFOFILE[32], *bat = batteries->battery[i].BAT;
     sprintf(INFOFILE, "%s/%s/info", ACPI_BAT, bat);
-    read_file(&batteries->BATTERY[i], battery_info_cb, INFOFILE);
-    sprintf(batteries->BATTERY[i].STATEFILE, "%s/%s/state", ACPI_BAT, bat);
+    read_file(&batteries->battery[i], battery_info_cb, INFOFILE);
+    sprintf(batteries->battery[i].STATEFILE, "%s/%s/state", ACPI_BAT, bat);
   }
 }
 
@@ -206,12 +243,13 @@ void battery_state_cb(void *data, const char STRING[])
 
 void init_batteries(batteries_t *batteries)
 {
-  batteries->NBAT = 0;
+  batteries->battery = malloc(1);
+  batteries->size = 0;
   read_dir(batteries, battery_cb, SYS_PS); 
-  for (unsigned i = 0; i < batteries->NBAT; i++)
+  for (unsigned i = 0; i < batteries->size; i++)
   {
-    char *bat = batteries->BATTERY[i].BAT;
-    sprintf(batteries->BATTERY[i].STATEFILE, "%s/%s/uevent", SYS_PS, bat);
+    char *bat = batteries->battery[i].BAT;
+    sprintf(batteries->battery[i].STATEFILE, "%s/%s/uevent", SYS_PS, bat);
   }
 }
 

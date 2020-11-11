@@ -19,7 +19,7 @@ static ip_t ip;
 static bool ac_state;
 static batteries_t batteries;
 static char SND[16], TIME[32];
-static unsigned long totalenergy_uj;
+static powercaps_t powercaps;
 static unsigned char interval = UPDATE_INTV;
 
 void set_quit_flag(const int signo)
@@ -30,6 +30,8 @@ void set_quit_flag(const int signo)
 
 static void deinit_status(void)
 {
+  deinit_power(&powercaps);
+  deinit_batteries(&batteries);
   deinit_ip(&ip);
 }
 
@@ -41,6 +43,7 @@ static void init_status(void)
   init_net(NET, WLAN);
   init_ip(&ip);
   init_batteries(&batteries);
+  init_power(&powercaps);
 }
 
 int main(int argc, char *argv[])
@@ -56,7 +59,7 @@ int main(int argc, char *argv[])
 
   while (!quit)
   {
-    fprintf(stdout, "%s%dW", PWRSYM, power(&totalenergy_uj, interval));
+    fprintf(stdout, "%s%dW", PWRSYM, power(&powercaps, interval));
     read_file(&cpu, cpu_cb, CPU);
     read_file(&cpu, cpu_cb, STAT);
     read_file(&mem, mem_cb, MEM);
@@ -101,14 +104,14 @@ int main(int argc, char *argv[])
     read_file(&ac_state, ac_cb, SYS_ACSTATE);
 #endif
     batteries.total_perc = 0;
-    for (unsigned i = 0; i < batteries.NBAT; i++)
+    for (unsigned i = 0; i < batteries.size; i++)
     {
-      read_file(&batteries.BATTERY[i], battery_state_cb, batteries.BATTERY[i].STATEFILE);
+      read_file(&batteries.battery[i], battery_state_cb, batteries.battery[i].STATEFILE);
       fprintf(stdout, "%s%s %d%% %c", DELIM, 
-          batteries.BATTERY[i].BAT, 
-          batteries.BATTERY[i].perc, 
-          batteries.BATTERY[i].state);
-      batteries.total_perc += batteries.BATTERY[i].perc;
+          batteries.battery[i].BAT, 
+          batteries.battery[i].perc, 
+          batteries.battery[i].state);
+      batteries.total_perc += batteries.battery[i].perc;
     }
     
     snd(SND);

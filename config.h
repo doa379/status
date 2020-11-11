@@ -2,7 +2,6 @@
 /* Update interval in sec */
 #define UPDATE_INTV_ON_BATTERY 30
 #define UPDATE_INTV	5
-#define MAX_BATTERIES 2
 #define SUSPEND_THRESHOLD_PERC 5
 /* #define PROC_ACPI */
 #define SLEEP_CMD "sudo /usr/local/bin/zzz M"

@@ -19,7 +19,7 @@
 #define SYS_ACSTATE "/sys/class/power_supply/AC/online"
 #define SND_CMD "lsof /dev/snd/*"
 #define DEVICES "/proc/bus/input/devices"
-#define ENERGY_CMD "cat /sys/class/powercap/*/energy_uj"
+#define ENERGY "/sys/class/powercap"
 #define kB			1024
 #define mB			(kB * kB)
 #define gB			(kB * mB)
@@ -96,9 +96,23 @@ typedef struct
 
 typedef struct
 {
-  unsigned NBAT, total_perc;
-  battery_t BATTERY[MAX_BATTERIES];
+  battery_t *battery;
+  size_t size;
+  unsigned total_perc;
 } batteries_t;
+
+typedef struct
+{
+  char STATEFILE[64];
+  unsigned long energy_uj;
+} powercap_t;
+
+typedef struct
+{
+  powercap_t *powercap;
+  size_t size;
+  unsigned long curr_energy_uj, prev_energy_uj;
+} powercaps_t;
 
 typedef struct
 {
@@ -131,6 +145,9 @@ unsigned write_kbps(diskstats_t *, unsigned);
 void blkdev_cb(void *, const char []);
 void mem_cb(void *, const char []);
 void cpu_cb(void *, const char []);
+void deinit_power(powercaps_t *);
+void init_power(powercaps_t *);
+void deinit_batteries(batteries_t *);
 void init_batteries(batteries_t *);
 void init_net(net_t [], wireless_t []);
 void init_diskstats(diskstats_t []);
