@@ -14,8 +14,19 @@ static const char *BLKDEV[] = { BLKDEVS };
 static const char *NETIF[] = { NETIFS };
 static const char *IPURL[] = { IPURLS };
 static char LINE[STRLEN];
+static cpu_t cpu;
+static mem_t mem;
+static diskstats_t DISKSTATS[LENGTH(BLKDEV)];
+static net_t NET[LENGTH(NETIF)];
+static wireless_t WLAN[LENGTH(NETIF)];
+static ip_t ip;
+static bool ac_state;
+static batteries_t batteries;
+static asound_cards_t asound_cards;
+static char TIME[32];
+static powercaps_t powercaps;
 
-void read_file(void *data, void (*cb)(), const char FILENAME[])
+static void read_file(void *data, void (*cb)(), const char FILENAME[])
 {
   FILE *fp = fopen(FILENAME, "r");
   if (!fp)
@@ -27,7 +38,7 @@ void read_file(void *data, void (*cb)(), const char FILENAME[])
   fclose(fp);
 }
 
-void read_dir(void *data, void (*cb)(), const char DIRNAME[])
+static void read_dir(void *data, void (*cb)(), const char DIRNAME[])
 {
   DIR *dp = opendir(DIRNAME);
   if (!dp)
@@ -103,28 +114,28 @@ void input_event_node(char NODE[], const char TYPE[])
   read_file(&device, parse_dev_cb, DEVICES);
 }
 
-void date(char TIME[], size_t size)
+const char *date(void)
 {
   time_t t = time(NULL);
-  strftime(TIME , size, "%R %a %d %b", localtime(&t));
+  strftime(TIME, sizeof TIME, "%R %a %d %b", localtime(&t));
+  return TIME;
 }
 
-void energyuj_cb(void *data, const char LINE[])
+static void energyuj_cb(void *data, const char LINE[])
 {
   unsigned long energy, *total_energy = data;
   sscanf(LINE, "%lu", &energy);
   *total_energy += energy;
 }
 
-unsigned power(void *data, unsigned interval)
+unsigned power(unsigned interval)
 {
-  powercaps_t *powercaps = data;
-  powercaps->prev_energy_uj = powercaps->curr_energy_uj;
-  powercaps->curr_energy_uj = 0;
-  for (unsigned i = 0; i < powercaps->size; i++)
-    read_file(&powercaps->curr_energy_uj, energyuj_cb, powercaps->powercap[i].STATEFILE);
+  powercaps.prev_energy_uj = powercaps.curr_energy_uj;
+  powercaps.curr_energy_uj = 0;
+  for (unsigned i = 0; i < powercaps.size; i++)
+    read_file(&powercaps.curr_energy_uj, energyuj_cb, powercaps.powercap[i].STATEFILE);
 
-  return (powercaps->curr_energy_uj - powercaps->prev_energy_uj) / 1e6 / interval;
+  return (powercaps.curr_energy_uj - powercaps.prev_energy_uj) / 1e6 / interval;
 }
 
 static void init_powercap_cb(void *data, const char STRING[])
@@ -144,24 +155,47 @@ static void init_powercap_cb(void *data, const char STRING[])
   }
 }
 
-void deinit_power(powercaps_t *powercaps)
+static void deinit_power(powercaps_t *powercaps)
 {
   free(powercaps->powercap);
 }
 
-void init_power(powercaps_t *powercaps)
+static void init_power(powercaps_t *powercaps)
 {
   powercaps->powercap = malloc(1);
   powercaps->size = 0;
   read_dir(powercaps, init_powercap_cb, ENERGY);
 }
 
-void snd_cb(void *data, const char LINE[])
+static void snd_cb(void *data, const char LINE[])
 {
   char *SND = data;
   unsigned pid;
   if (sscanf(LINE, "owner_pid  : %d", &pid))
     sprintf(SND, "%d", pid);
+}
+
+const char *asound_card_c(unsigned i)
+{
+  return asound_cards.card[i].C_SND;
+}
+
+const char *asound_card_p(unsigned i)
+{
+  return asound_cards.card[i].P_SND;
+}
+
+void refresh_asound_card(unsigned i)
+{
+  asound_cards.card[i].P_SND[0] = '\0';
+  asound_cards.card[i].C_SND[0] = '\0';
+  read_file(asound_cards.card[i].P_SND, snd_cb, asound_cards.card[i].P_STATEFILE);
+  read_file(asound_cards.card[i].C_SND, snd_cb, asound_cards.card[i].C_STATEFILE);
+}
+
+unsigned asound_cards_size(void)
+{
+  return asound_cards.size;
 }
 
 static void init_snd_cb(void *data, const char FILENAME[])
@@ -179,19 +213,24 @@ static void init_snd_cb(void *data, const char FILENAME[])
   }
 }
 
-void deinit_snd(asound_cards_t *asound_cards)
+static void deinit_snd(asound_cards_t *asound_cards)
 {
   free(asound_cards->card);
 }
 
-void init_snd(asound_cards_t *asound_cards)
+static void init_snd(asound_cards_t *asound_cards)
 {
   asound_cards->card = malloc(1);
   asound_cards->size = 0;
   read_dir(asound_cards, init_snd_cb, SOUND);
 }
 
-void battery_cb(void *data, const char STRING[])
+bool ac(void)
+{
+  return ac_state;
+}
+
+static void battery_cb(void *data, const char STRING[])
 {
   batteries_t *batteries = data;
   if (!strncmp("BAT", STRING, 3))
@@ -203,13 +242,13 @@ void battery_cb(void *data, const char STRING[])
   }
 }
 
-void deinit_batteries(batteries_t *batteries)
+static void deinit_batteries(batteries_t *batteries)
 {
   free(batteries->battery);
 }
 
 #ifdef PROC_ACPI
-void battery_state_cb(void *data, const char STRING[])
+static void battery_state_cb(void *data, const char STRING[])
 {
   battery_t *battery = data, tmp;
   if (sscanf(STRING, "charging state: %s", tmp.STATE))
@@ -223,7 +262,7 @@ void battery_state_cb(void *data, const char STRING[])
   }
 }
 
-void battery_info_cb(void *data, const char STRING[])
+static void battery_info_cb(void *data, const char STRING[])
 {
   battery_t *battery = data, tmp;
   if (sscanf(STRING, "design capacity: %d", &tmp.capacity))
@@ -244,7 +283,7 @@ static void init_batteries(batteries_t *batteries)
   }
 }
 
-void ac_cb(void *data, const char STRING[])
+static void ac_cb(void *data, const char STRING[])
 {
   bool *ac_state = data;
   if (!strcmp("state: on-line", STRING))
@@ -252,8 +291,13 @@ void ac_cb(void *data, const char STRING[])
   else
     *ac_online = 0;
 }
+
+void refresh_ps(void)
+{
+  read_file(&ac_state, ac_cb, ACPI_ACSTATE);
+}
 #else
-void battery_state_cb(void *data, const char STRING[])
+static void battery_state_cb(void *data, const char STRING[])
 {
   battery_t *battery = data, tmp;
   if (sscanf(STRING, "POWER_SUPPLY_STATUS=%c", &tmp.state))
@@ -264,7 +308,7 @@ void battery_state_cb(void *data, const char STRING[])
     battery->perc = tmp.perc;
 }
 
-void init_batteries(batteries_t *batteries)
+static void init_batteries(batteries_t *batteries)
 {
   batteries->battery = malloc(1);
   batteries->size = 0;
@@ -276,32 +320,112 @@ void init_batteries(batteries_t *batteries)
   }
 }
 
-void ac_cb(void *data, const char STRING[])
+static void ac_cb(void *data, const char STRING[])
 {
   bool *ac_state = data;
   unsigned val;
   sscanf(STRING, "%ud", &val);
   *ac_state = !val;
 }
-#endif
-void public_ip(ip_t *ip)
+
+void refresh_ps(void)
 {
-  if (curl_easy_perform(ip->handle) != CURLE_OK)
-    strcpy(ip->CURR, "No IP");
-  else if (strcmp(ip->BUFFER, ip->CURR)
-    && strcmp("No IP", ip->CURR))
+  read_file(&ac_state, ac_cb, SYS_ACSTATE);
+}
+#endif
+char battery_state(unsigned i)
+{
+  return batteries.battery[i].state;
+}
+
+unsigned battery_perc(unsigned i)
+{
+  return batteries.battery[i].perc;
+}
+
+const char *battery_string(unsigned i)
+{
+  return batteries.battery[i].BAT;
+}
+
+void refresh_battery(unsigned i)
+{
+  read_file(&batteries.battery[i], battery_state_cb, batteries.battery[i].STATEFILE);
+}
+
+unsigned batteries_size(void)
+{
+  return batteries.size;
+}
+
+const char *prev_ip(void)
+{
+  return ip.PREV;
+}
+
+const char *curr_ip(void)
+{
+  return ip.CURR;
+}
+
+void refresh_publicip(void)
+{
+  if (curl_easy_perform(ip.handle) != CURLE_OK)
+    strcpy(ip.CURR, "No IP");
+  else if (strcmp(ip.BUFFER, ip.CURR)
+    && strcmp("No IP", ip.CURR))
   {
     FILE *fp = fopen(IPLIST, "a+");
     if (!fp)
       return;
 
-    fprintf(fp, "%s\n", ip->BUFFER);
+    fprintf(fp, "%s\n", ip.BUFFER);
     fclose(fp);
-    strcpy(ip->PREV, ip->CURR);
-    strcpy(ip->CURR, ip->BUFFER);
+    strcpy(ip.PREV, ip.CURR);
+    strcpy(ip.CURR, ip.BUFFER);
   }
   else
-    strcpy(ip->CURR, ip->BUFFER);
+    strcpy(ip.CURR, ip.BUFFER);
+}
+
+unsigned wireless_link(unsigned i)
+{
+  wireless_t *wireless = &WLAN[i];
+  return wireless->link / 70. * 100;
+}
+
+const char *ssid_string(unsigned i)
+{
+  ssid_t *ssid = &WLAN[i].ssid;
+  return ssid->SSID;
+}
+
+static void wireless_cb(void *data, const char LINE[])
+{
+  wireless_t *wireless = data, tmp;
+  sscanf(LINE, "%s %*[^ ] %f %f %f", tmp.IFNAME, &tmp.link, &tmp.level, &tmp.noise);
+  if (strncmp(tmp.IFNAME, wireless->net->netif, strlen(wireless->net->netif)) == 0)
+  {
+    wireless->link = tmp.link;
+    wireless->level = tmp.level;
+    wireless->noise = tmp.noise;
+  }
+}
+
+bool ssid(unsigned i)
+{
+  ssid_t *ssid = &WLAN[i].ssid;
+  memset(ssid->SSID, 0, sizeof ssid->SSID);
+  ssid->wreq.u.essid.pointer = ssid->SSID;
+  ssid->wreq.u.essid.length = sizeof ssid->SSID;
+  ioctl(ssid->sockfd, SIOCGIWESSID, &ssid->wreq);
+  if (strlen(ssid->SSID))
+  {
+    read_file(&WLAN[i], wireless_cb, WIRELESS);
+    return 1;
+  }
+
+  return 0;
 }
 
 static bool init_ssid(ssid_t *ssid, const char NETIF[])
@@ -314,37 +438,7 @@ static bool init_ssid(ssid_t *ssid, const char NETIF[])
   return 0;
 }
 
-void ssid(ssid_t *ssid)
-{
-  memset(ssid->SSID, 0, sizeof ssid->SSID);
-  ssid->wreq.u.essid.pointer = ssid->SSID;
-  ssid->wreq.u.essid.length = sizeof ssid->SSID;
-  ioctl(ssid->sockfd, SIOCGIWESSID, &ssid->wreq);
-}
-
-void wireless_cb(void *data, const char LINE[])
-{
-  wireless_t *wireless = data, tmp;
-  sscanf(LINE, "%s %*[^ ] %f %f %f", tmp.IFNAME, &tmp.link, &tmp.level, &tmp.noise);
-  if (strncmp(tmp.IFNAME, wireless->net->netif, strlen(wireless->net->netif)) == 0)
-  {
-    wireless->link = tmp.link;
-    wireless->level = tmp.level;
-    wireless->noise = tmp.noise;
-  }
-}
-
-unsigned up_kbps(net_t *net, unsigned interval)
-{
-  return (net->TXbytes - net->prev_TXbytes) / kB / interval;
-}
-
-unsigned down_kbps(net_t *net, unsigned interval)
-{
-  return (net->RXbytes - net->prev_RXbytes) / kB / interval;
-}
-
-void net_cb(void *data, const char LINE[])
+static void net_cb(void *data, const char LINE[])
 {
   net_t *net = data, tmp;
   sscanf(LINE, "%s %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ]",
@@ -361,12 +455,35 @@ void net_cb(void *data, const char LINE[])
   }
 }
 
-unsigned wireless_link(wireless_t *wireless)
+void refresh_netadapter(unsigned i)
 {
-  return wireless->link / 70. * 100;
+  read_file(&NET[i], net_cb, NET_ADAPTERS);
 }
 
-void init_net(net_t NET[], wireless_t WLAN[])
+unsigned rx_total_kb(unsigned i)
+{
+  net_t *net = &NET[i];
+  return net->RXbytes / kB;
+}
+
+unsigned tx_total_kb(unsigned i)
+{
+  net_t *net = &NET[i];
+  return net->TXbytes / kB;
+}
+
+unsigned rx_kbps(unsigned i, unsigned interval)
+{
+  net_t *net = &NET[i];
+  return (net->RXbytes - net->prev_RXbytes) / kB / interval;
+}
+unsigned tx_kbps(unsigned i, unsigned interval)
+{
+  net_t *net = &NET[i];
+  return (net->TXbytes - net->prev_TXbytes) / kB / interval;
+}
+
+static void init_net(net_t NET[], wireless_t WLAN[])
 {
   for (unsigned i = 0; i < LENGTH(NETIF); i++)
   {
@@ -387,17 +504,7 @@ unsigned du_perc(const char DIRECTORY[])
   return (1 - ((float) fs.f_bfree / (float) fs.f_blocks)) * 100;
 }
 
-unsigned read_kbps(diskstats_t *diskstats, unsigned interval)
-{
-  return (diskstats->rd_sec_or_wr_ios - diskstats->prev_rd_sec_or_wr_ios) / 2. / interval;
-}
-
-unsigned write_kbps(diskstats_t *diskstats, unsigned interval)
-{
-  return (diskstats->wr_sec - diskstats->prev_wr_sec) / 2. / interval;
-}
-
-void blkdev_cb(void *data, const char LINE[])
+static void blkdev_cb(void *data, const char LINE[])
 {
   diskstats_t *diskstats = data, tmp;
   sscanf(LINE, " %*[^ ] %*[^ ] %s %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ]",
@@ -414,7 +521,25 @@ void blkdev_cb(void *data, const char LINE[])
   }
 }
 
-void init_diskstats(diskstats_t DISKSTATS[])
+unsigned write_kbps(unsigned i, unsigned interval)
+{
+  diskstats_t *diskstats = &DISKSTATS[i];
+  return (diskstats->wr_sec - diskstats->prev_wr_sec) / 2. / interval;
+}
+
+unsigned read_kbps(unsigned i, unsigned interval)
+{
+  diskstats_t *diskstats = &DISKSTATS[i];
+  return (diskstats->rd_sec_or_wr_ios - diskstats->prev_rd_sec_or_wr_ios) / 2. / interval;
+}
+
+void refresh_diskstats(unsigned i)
+{
+  diskstats_t *diskstats = &DISKSTATS[i];
+  read_file(diskstats, blkdev_cb, DISKSTAT);
+}
+
+static void init_diskstats(diskstats_t DISKSTATS[])
 {
   for (unsigned i = 0; i < LENGTH(BLKDEV); i++)
   {
@@ -423,7 +548,7 @@ void init_diskstats(diskstats_t DISKSTATS[])
   }
 }
 
-void mem_cb(void *data, const char LINE[])
+static void mem_cb(void *data, const char LINE[])
 {
   mem_t *mem = data;
   sscanf(LINE, "MemTotal: %lu", &mem->total);
@@ -438,7 +563,18 @@ void mem_cb(void *data, const char LINE[])
   mem->swap = mem->swaptotal - mem->swapfree - mem->swapcached;
 }
 
-void cpu_cb(void *data, const char LINE[])
+float mem_swap(void)
+{
+  return mem.swap;
+}
+
+float mem_perc(void)
+{
+  read_file(&mem, mem_cb, MEM);
+  return mem.perc;
+}
+
+static void cpustat_cb(void *data, const char LINE[])
 {
   cpu_t *cpu = data, tmp;
   if (sscanf(LINE, "cpu%*[^0-9] %lu %lu %lu %lu %lu %lu %lu",
@@ -463,12 +599,28 @@ void cpu_cb(void *data, const char LINE[])
     cpu->irq = tmp.irq;
     cpu->softirq = tmp.softirq;
   }
+}
 
-  else if (sscanf(LINE, "processor : %ud", &tmp.processor) == 1)
+static void cpuinfo_cb(void *data, const char LINE[])
+{
+  cpu_t *cpu = data, tmp;
+  if (sscanf(LINE, "processor : %ud", &tmp.processor) == 1)
     cpu->processor = tmp.processor;
   else if (sscanf(LINE, "cpu MHz : %f", &tmp.mhz) == 1)
     /* Calculate the rolling average wrt number of cores */
     cpu->mhz = (cpu->mhz * (cpu->processor) + tmp.mhz) / (cpu->processor + 1);
+}
+
+float cpu_mhz(void)
+{
+  read_file(&cpu, cpuinfo_cb, CPU);
+  return cpu.mhz;
+}
+
+float cpu_perc(void)
+{
+  read_file(&cpu, cpustat_cb, STAT);
+  return cpu.perc;
 }
 
 static size_t writefunc(void *ptr, size_t size, size_t nmemb, void *data)
@@ -501,14 +653,35 @@ static void init_curl(ip_t *ip)
   curl_easy_setopt(ip->handle, CURLOPT_TIMEOUT_MS, 250L);
 }
 
-void deinit_ip(ip_t *ip)
+static void deinit_ip(ip_t *ip)
 {
   deinit_curl(ip);
 }
 
-void init_ip(ip_t *ip)
+static void init_ip(ip_t *ip)
 {
   init_curl(ip);
   tail(ip->CURR, sizeof ip->CURR, IPLIST, 1);
   tail(ip->PREV, sizeof ip->PREV, IPLIST, 2);
 }
+
+void deinit_status(void)
+{
+  deinit_power(&powercaps);
+  deinit_snd(&asound_cards);
+  deinit_batteries(&batteries);
+  deinit_ip(&ip);
+}
+
+void init_status(void)
+{
+  setlocale(LC_ALL, "");
+  setbuf(stdout, NULL);
+  init_diskstats(DISKSTATS);
+  init_net(NET, WLAN);
+  init_ip(&ip);
+  init_batteries(&batteries);
+  init_snd(&asound_cards);
+  init_power(&powercaps);
+}
+
