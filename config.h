@@ -32,6 +32,7 @@
 #define DOWN                    DOWN_TRI
 #define PWRSYM                  "⚡"
 #define SNDSYM                  "♬"
+#define MICSYM                  "\u2706"
 #define DELIM		                "|"
 #define IPLIST                  "/tmp/iplist"
 #define BLKDEVS                 /*"sda",*/ "nvme0n1"

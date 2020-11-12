@@ -127,7 +127,7 @@ unsigned power(void *data, unsigned interval)
   return (powercaps->curr_energy_uj - powercaps->prev_energy_uj) / 1e6 / interval;
 }
 
-void powercap_cb(void *data, const char STRING[])
+static void init_powercap_cb(void *data, const char STRING[])
 {
   powercaps_t *powercaps = data;
   powercap_t powercap;
@@ -153,21 +153,42 @@ void init_power(powercaps_t *powercaps)
 {
   powercaps->powercap = malloc(1);
   powercaps->size = 0;
-  read_dir(powercaps, powercap_cb, ENERGY);
+  read_dir(powercaps, init_powercap_cb, ENERGY);
 }
 
 void snd_cb(void *data, const char LINE[])
 {
-  char *snd = data;
+  char *SND = data;
   unsigned pid;
-  if (sscanf(LINE, "  Client application %d : running", &pid))
-    sprintf(snd, "%d", pid);
+  if (sscanf(LINE, "owner_pid  : %d", &pid))
+    sprintf(SND, "%d", pid);
 }
 
-void snd(char SND[])
+static void init_snd_cb(void *data, const char FILENAME[])
 {
-  SND[0] = '\0';
-  read_file(SND, snd_cb, SOUND);
+  asound_cards_t *asound_cards = data;
+  if (!strncmp(FILENAME, "card", 4) && strcmp(FILENAME, "cards"))
+  {
+    asound_cards->card = realloc(asound_cards->card, 
+      (asound_cards->size + 1) * sizeof(asound_card_t));
+    sprintf(asound_cards->card[asound_cards->size].P_STATEFILE, 
+      "%s/%s/pcm0p/sub0/status", SOUND, FILENAME);
+    sprintf(asound_cards->card[asound_cards->size].C_STATEFILE, 
+      "%s/%s/pcm0c/sub0/status", SOUND, FILENAME);
+    asound_cards->size++;
+  }
+}
+
+void deinit_snd(asound_cards_t *asound_cards)
+{
+  free(asound_cards->card);
+}
+
+void init_snd(asound_cards_t *asound_cards)
+{
+  asound_cards->card = malloc(1);
+  asound_cards->size = 0;
+  read_dir(asound_cards, init_snd_cb, SOUND);
 }
 
 void battery_cb(void *data, const char STRING[])
@@ -279,6 +300,8 @@ void public_ip(ip_t *ip)
     strcpy(ip->PREV, ip->CURR);
     strcpy(ip->CURR, ip->BUFFER);
   }
+  else
+    strcpy(ip->CURR, ip->BUFFER);
 }
 
 static bool init_ssid(ssid_t *ssid, const char NETIF[])

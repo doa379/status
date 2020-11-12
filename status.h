@@ -17,7 +17,7 @@
 #define ACPI_BAT "/proc/acpi/battery"
 #define SYS_PS "/sys/class/power_supply"
 #define SYS_ACSTATE "/sys/class/power_supply/AC/online"
-#define SOUND "/proc/asound/timers"
+#define SOUND "/proc/asound"
 #define DEVICES "/proc/bus/input/devices"
 #define ENERGY "/sys/class/powercap"
 #define kB			1024
@@ -116,6 +116,18 @@ typedef struct
 
 typedef struct
 {
+  char P_STATEFILE[64], C_STATEFILE[64];
+  char P_SND[16], C_SND[16];
+} asound_card_t;
+
+typedef struct
+{
+  asound_card_t *card;
+  size_t size;
+} asound_cards_t;
+
+typedef struct
+{
   char *node;
   const char *type;
   bool found;
@@ -127,7 +139,7 @@ char *format_units(float);
 void input_event_node(char [], const char []);
 void date(char [], size_t);
 unsigned power(void *, unsigned);
-void snd(char []);
+void snd_cb(void *, const char []);
 void battery_cb(void *, const char []);
 void battery_state_cb(void *, const char []);
 void battery_info_cb(void *, const char []);
@@ -149,6 +161,8 @@ void deinit_power(powercaps_t *);
 void init_power(powercaps_t *);
 void deinit_batteries(batteries_t *);
 void init_batteries(batteries_t *);
+void deinit_snd(asound_cards_t *);
+void init_snd(asound_cards_t *);
 void init_net(net_t [], wireless_t []);
 void init_diskstats(diskstats_t []);
 void deinit_ip(ip_t *);
