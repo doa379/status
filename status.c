@@ -685,3 +685,12 @@ void init_status(void)
   init_power(&powercaps);
 }
 
+void print(char RESULT[], const char *format, ...)
+{
+  va_list args = { 0 };
+  char STRING[64];
+  va_start(args, format);
+  vsnprintf(STRING, 64, format, args);
+  va_end(args);
+  strcat(RESULT, STRING);
+}

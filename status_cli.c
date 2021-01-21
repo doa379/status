@@ -15,6 +15,7 @@ void set_quit_flag(const int signo)
 {
   (void) signo;
   quit = 1;
+  fprintf(stdout, "Exit..\n");
 }
 
 int main(int argc, char *argv[])
@@ -60,7 +61,7 @@ int main(int argc, char *argv[])
     }
 
     refresh_publicip();
-    if (!strcmp(prev_ip(), curr_ip()) || !strlen(prev_ip()))
+    if (!strcmp(prev_ip(), curr_ip()))
       fprintf(stdout, "%s%s", DELIM, curr_ip());
     else
       fprintf(stdout, "%s%s%s%s", DELIM, prev_ip(), RIGHT_ARROW, curr_ip());

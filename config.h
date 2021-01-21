@@ -2,17 +2,7 @@
 /* Update interval in sec */
 #define UPDATE_INTV_ON_BATTERY 30
 #define UPDATE_INTV	5
-#define SUSPEND_THRESHOLD_PERC 5
 /* #define PROC_ACPI */
-#define SLEEP_CMD "sudo /usr/local/bin/zzz M"
-#define SUSPEND_CMD "sudo /usr/local/bin/zzz D"
-#define SWITCHDISPLAY_CMD "switchdisplay"
-#define VOLUMEMUTE_CMD "vol 0"
-#define VOLUMEUP_CMD "vol +"
-#define VOLUMEDOWN_CMD "vol -"
-#define BRIGHTNESSUP_CMD "sudo /usr/local/bin/backlight +"
-#define BRIGHTNESSDOWN_CMD "sudo /usr/local/bin/backlight -"
-#define LOCKALL_CMD "lockall"
 #define UP_ARROW                "\u2b06"
 #define DOWN_ARROW		          "\u2b07"
 #define UP_TRI                  "\u25b4"
@@ -35,7 +25,7 @@
 #define MICSYM                  "\u2706"
 #define DELIM		                "|"
 #define IPLIST                  "/tmp/iplist"
-#define BLKDEVS                 /*"sda",*/ "nvme0n1"
+#define BLKDEVS                 "sda"
 #define DIRECTORIES             "/", "/tmp"
 #define NETIFS                  "eth0", "wlan0", /*"wlan1", "wlan2"*/
 #define IPURLS                  \

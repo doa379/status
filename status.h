@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <linux/wireless.h>
 #include <curl/curl.h>
+#include <stdarg.h>
 #include "config.h"
 
 #define LENGTH(X)		(sizeof X / sizeof X[0])
@@ -98,7 +99,6 @@ typedef struct
 {
   battery_t *battery;
   size_t size;
-  unsigned total_perc;
 } batteries_t;
 
 typedef struct
@@ -169,4 +169,5 @@ float cpu_mhz(void);
 float cpu_perc(void);
 void deinit_status(void);
 void init_status(void);
+void print(char [], const char *, ...);
 #endif
