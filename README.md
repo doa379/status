@@ -1,10 +1,7 @@
 # status
 
-This utility outputs a string of vital system stats information. The output can be piped through to xsetroot or used in .tmux.conf.
-
-`(status | while read LINE; do xsetroot -name "$(echo $LINE)"; done)`
-
-The utility also captures keyboard events and execs a corresponding shell script. The user should be part of the group "input". Programs requiring super user access (sudo) such as power states or other hardware access should make the necessary authorization in the sudoers file.
+This utility outputs a string of system stats. The output can be piped through to xsetroot or used in .tmux.conf.
+`(sudo /usr/local/bin/status | while read LINE; do xsetroot -name "$(echo $LINE)"; done)`
 
 `#/etc/sudoers.d/local`\
-`%users ALL= NOPASSWD: /usr/local/bin/zzz, /usr/local/bin/backlight`
+`%users ALL= NOPASSWD: /usr/local/bin/status`
