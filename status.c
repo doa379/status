@@ -358,6 +358,45 @@ unsigned batteries_size(void)
   return batteries.size;
 }
 
+void refresh_batteries(void)
+{
+  unsigned perc = 0;
+  char state = 'F';
+  for (unsigned i = 0; i < batteries_size(); i++)
+  {
+    refresh_battery(i);
+    perc += battery_perc(i);
+    if (battery_state(i) == 'D')
+      state = battery_state(i);
+  }
+
+  batteries.perc = perc / batteries_size();
+  if (state != 'D')
+  {
+  	for (unsigned i = 0; i < batteries_size(); i++)
+    	if (battery_state(i) == 'C')
+      	state = battery_state(i);
+  }
+  if (state != 'D' || state != 'C')
+  {
+  	for (unsigned i = 0; i < batteries_size(); i++)
+    	if (battery_state(i) == 'U')
+      	state = battery_state(i);
+  }
+ 
+  batteries.state = state;
+}
+
+char batteries_state(void)
+{
+  return batteries.state;
+}
+
+unsigned batteries_perc(void)
+{
+  return batteries.perc;
+}
+
 const char *prev_ip(void)
 {
   return ip.PREV;

@@ -27,7 +27,7 @@
 #define IPLIST                  "/tmp/iplist"
 #define BLKDEVS                 "sda"
 #define DIRECTORIES             "/", "/tmp"
-#define NETIFS                  "eth0", "wlan0", /*"wlan1", "wlan2"*/
+#define NETIFS                  "wlan0",
 #define IPURLS                  \
 	"http://whatismyip.akamai.com",\
 	"http://checkip.amazonaws.com",\

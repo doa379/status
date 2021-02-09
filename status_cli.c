@@ -67,6 +67,7 @@ int main(int argc, char *argv[])
       fprintf(stdout, "%s%s%s%s", DELIM, prev_ip(), RIGHT_ARROW, curr_ip());
     
     refresh_ps();
+    /*
     for (unsigned i = 0; i < batteries_size(); i++)
     {
       refresh_battery(i);
@@ -75,6 +76,9 @@ int main(int argc, char *argv[])
           battery_perc(i), 
           battery_state(i));
     }
+    */
+    refresh_batteries();
+    fprintf(stdout, "%s%s %d%% %c", DELIM, "BAT", batteries_perc(), batteries_state());
     
     for (unsigned i = 0; i < asound_cards_size(); i++)
     {

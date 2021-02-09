@@ -99,6 +99,8 @@ typedef struct
 {
   battery_t *battery;
   size_t size;
+  unsigned perc;
+  char state;
 } batteries_t;
 
 typedef struct
@@ -147,6 +149,9 @@ unsigned battery_perc(unsigned);
 const char *battery_string(unsigned);
 void refresh_battery(unsigned);
 unsigned batteries_size(void);
+void refresh_batteries(void);
+char batteries_state(void);
+unsigned batteries_perc(void);
 void refresh_ps(void);
 const char *prev_ip();
 const char *curr_ip();
