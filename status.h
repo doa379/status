@@ -83,7 +83,7 @@ typedef struct
 typedef struct
 {
   CURL *handle;
-  char BUFFER[64], CURR[64], PREV[64];
+  char BUFFER[64];
 } ip_t;
 
 typedef struct
@@ -92,7 +92,7 @@ typedef struct
            remaining,
            rate, 
            perc;
-  char BAT[8], STATEFILE[48], state;
+  char BAT[8], STATEFILE[64], state;
 } battery_t;
 
 typedef struct
@@ -105,7 +105,7 @@ typedef struct
 
 typedef struct
 {
-  char STATEFILE[64];
+  char STATEFILE[512];
   unsigned long energy_uj;
 } powercap_t;
 
@@ -118,7 +118,7 @@ typedef struct
 
 typedef struct
 {
-  char P_STATEFILE[64], C_STATEFILE[64];
+  char P_STATEFILE[512], C_STATEFILE[512];
   char P_SND[16], C_SND[16];
 } asound_card_t;
 
@@ -136,11 +136,11 @@ typedef struct
 } device_t;
 
 char *format_units(float);
+void tail(char [], size_t, const char [], unsigned char);
 void input_event_node(char [], const char []);
 const char *date(void);
 const char *asound_card_c(unsigned);
 const char *asound_card_p(unsigned);
-void refresh_asound_card(unsigned);
 unsigned asound_cards_size(void);
 unsigned power(unsigned);
 bool ac(void);
@@ -153,9 +153,7 @@ void refresh_batteries(void);
 char batteries_state(void);
 unsigned batteries_perc(void);
 void refresh_ps(void);
-const char *prev_ip();
-const char *curr_ip();
-void refresh_publicip(void);
+const char *public_ip();
 unsigned wireless_link(unsigned);
 const char *ssid_string(unsigned);
 bool ssid(unsigned);

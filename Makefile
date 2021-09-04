@@ -7,7 +7,7 @@ SRC_STATUSCLI = status_cli.c
 OBJ_STATUSCLI = ${SRC_STATUSCLI:.c=.o}
 
 CC      = gcc
-CFLAGS  = -c -g -Wall -Wextra -Werror -pie -fPIC ${INCS}
+CFLAGS  = -c -Wall -Wextra -Werror -pie -fPIC -O3 ${INCS}
 LDFLAGS = ${LIBS}
 
 all: libstatus.so status
@@ -26,4 +26,4 @@ status:	${OBJ_STATUSCLI}
 
 clean:
 	@echo cleaning
-	@rm -f status ${OBJ_STATUSLIB} ${OBJ_STATUSCLI}
+	@rm -f libstatus.so status ${OBJ_STATUSLIB} ${OBJ_STATUSCLI}

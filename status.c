@@ -67,7 +67,7 @@ char *format_units(float val)
   return STRING;
 }
 
-static void tail(char LINE[], size_t size, const char FILENAME[], unsigned char n)
+void tail(char LINE[], size_t size, const char FILENAME[], unsigned char n)
 {
   FILE *fp = fopen(FILENAME, "r");
   if (!fp)
@@ -117,7 +117,7 @@ void input_event_node(char NODE[], const char TYPE[])
 const char *date(void)
 {
   time_t t = time(NULL);
-  strftime(TIME, sizeof TIME, "%R %a %d %b", localtime(&t));
+  strftime(TIME, sizeof TIME, "%l:%M %a %d%b", localtime(&t));
   return TIME;
 }
 
@@ -177,20 +177,16 @@ static void snd_cb(void *data, const char LINE[])
 
 const char *asound_card_c(unsigned i)
 {
+  asound_cards.card[i].C_SND[0] = '\0';
+  read_file(asound_cards.card[i].C_SND, snd_cb, asound_cards.card[i].C_STATEFILE);
   return asound_cards.card[i].C_SND;
 }
 
 const char *asound_card_p(unsigned i)
 {
-  return asound_cards.card[i].P_SND;
-}
-
-void refresh_asound_card(unsigned i)
-{
   asound_cards.card[i].P_SND[0] = '\0';
-  asound_cards.card[i].C_SND[0] = '\0';
   read_file(asound_cards.card[i].P_SND, snd_cb, asound_cards.card[i].P_STATEFILE);
-  read_file(asound_cards.card[i].C_SND, snd_cb, asound_cards.card[i].C_STATEFILE);
+  return asound_cards.card[i].P_SND;
 }
 
 unsigned asound_cards_size(void)
@@ -397,34 +393,12 @@ unsigned batteries_perc(void)
   return batteries.perc;
 }
 
-const char *prev_ip(void)
+const char *public_ip(void)
 {
-  return ip.PREV;
-}
-
-const char *curr_ip(void)
-{
-  return ip.CURR;
-}
-
-void refresh_publicip(void)
-{
-  if (curl_easy_perform(ip.handle) != CURLE_OK)
-    strcpy(ip.CURR, "No IP");
-  else if (strcmp(ip.BUFFER, ip.CURR)
-    && strcmp("No IP", ip.CURR))
-  {
-    FILE *fp = fopen(IPLIST, "a+");
-    if (!fp)
-      return;
-
-    fprintf(fp, "%s\n", ip.BUFFER);
-    fclose(fp);
-    strcpy(ip.PREV, ip.CURR);
-    strcpy(ip.CURR, ip.BUFFER);
-  }
-  else
-    strcpy(ip.CURR, ip.BUFFER);
+  if (curl_easy_perform(ip.handle) != CURLE_OK ||
+    ip.BUFFER[0] == '\0')
+    strcpy(ip.BUFFER, "No IP");
+  return ip.BUFFER;
 }
 
 unsigned wireless_link(unsigned i)
@@ -672,7 +646,8 @@ static size_t writefunc(void *ptr, size_t size, size_t nmemb, void *data)
     memcpy(ip->BUFFER, ptr, S);
     ip->BUFFER[S] = '\0';
   }
-  else ip->BUFFER[0] = '\0';
+  else 
+    ip->BUFFER[0] = '\0';
 
   return S;
 }
@@ -700,8 +675,6 @@ static void deinit_ip(ip_t *ip)
 static void init_ip(ip_t *ip)
 {
   init_curl(ip);
-  tail(ip->CURR, sizeof ip->CURR, IPLIST, 1);
-  tail(ip->PREV, sizeof ip->PREV, IPLIST, 2);
 }
 
 void deinit_status(void)

@@ -15,7 +15,7 @@ void set_quit_flag(const int signo)
 {
   (void) signo;
   quit = 1;
-  fprintf(stdout, "Exit..\n");
+  fprintf(stdout, "\nExit..\n");
 }
 
 int main(int argc, char *argv[])
@@ -34,7 +34,6 @@ int main(int argc, char *argv[])
     fprintf(stdout, "%s%dW", PWRSYM, power(interval));
     fprintf(stdout, "%s%.0lf%% %.0fMHz", DELIM, cpu_perc(), cpu_mhz());
     fprintf(stdout, "%s%.0f%% (%s)", DELIM, mem_perc(), format_units(mem_swap()));
-    
     for (unsigned i = 0; i < LENGTH(BLKDEV); i++)
     {
       fprintf(stdout, "%s%s ", DELIM, BLKDEV[i]);
@@ -49,9 +48,11 @@ int main(int argc, char *argv[])
 
     for (unsigned i = 0; i < LENGTH(NETIF); i++)
     {
-      fprintf(stdout, "%s%s ", DELIM, NETIF[i]);
+      fprintf(stdout, "%s ", DELIM);
       if (ssid(i))
         fprintf(stdout, "%s %d%% ", ssid_string(i), wireless_link(i));
+      else
+        fprintf(stdout, "%s ", NETIF[i]);
 
       refresh_netadapter(i);
       fprintf(stdout, "%s%s", UP, format_units(tx_kbps(i, interval)));
@@ -60,32 +61,15 @@ int main(int argc, char *argv[])
       fprintf(stdout, "(%s)", format_units(rx_total_kb(i)));
     }
 
-    refresh_publicip();
-    if (!strcmp(prev_ip(), curr_ip()))
-      fprintf(stdout, "%s%s", DELIM, curr_ip());
-    else
-      fprintf(stdout, "%s%s%s%s", DELIM, prev_ip(), RIGHT_ARROW, curr_ip());
-    
+    fprintf(stdout, "%s%s", DELIM, public_ip());
     refresh_ps();
-    /*
-    for (unsigned i = 0; i < batteries_size(); i++)
-    {
-      refresh_battery(i);
-      fprintf(stdout, "%s%s %d%% %c", DELIM, 
-          battery_string(i), 
-          battery_perc(i), 
-          battery_state(i));
-    }
-    */
     refresh_batteries();
-    fprintf(stdout, "%s%s %d%% %c", DELIM, "BAT", batteries_perc(), batteries_state());
-    
+    fprintf(stdout, "%s%s %d%% %c", DELIM, BATSYM, batteries_perc(), batteries_state());
     for (unsigned i = 0; i < asound_cards_size(); i++)
-    {
-      refresh_asound_card(i);
-      fprintf(stdout, "%s%s%s%s%s", 
-        DELIM, SNDSYM, asound_card_p(i), MICSYM, asound_card_c(i));
-    }
+      if (asound_card_p(i)[0] != '\0' || asound_card_c(i)[0] != '\0')
+        fprintf(stdout, "%s%s%s", 
+          DELIM, asound_card_p(i)[0] != '\0' ? SNDSYM : "", asound_card_c(i)[0] != '\0' ? MICSYM : "");
+
     fprintf(stdout, "%s%s\n", DELIM, date());
     /* Wait */
     interval = ac() ? UPDATE_INTV_ON_BATTERY : UPDATE_INTV;

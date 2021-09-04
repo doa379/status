@@ -20,11 +20,11 @@
 #define DASH_VERT               "\u250a"
 #define UP                      UP_TRI
 #define DOWN                    DOWN_TRI
-#define PWRSYM                  "⚡"
-#define SNDSYM                  "♬"
+#define PWRSYM                  "\u26a1"
+#define SNDSYM                  "\u266c"
 #define MICSYM                  "\u2706"
+#define BATSYM		              "B"
 #define DELIM		                "|"
-#define IPLIST                  "/tmp/iplist"
 #define BLKDEVS                 "sda"
 #define DIRECTORIES             "/", "/tmp"
 #define NETIFS                  "wlan0",
