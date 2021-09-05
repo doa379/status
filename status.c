@@ -52,7 +52,7 @@ static void read_dir(void *data, void (*cb)(), const char DIRNAME[])
   closedir(dp);
 }
 
-char *format_units(float val)
+const char *fmt_units(float val)
 { /* Function expects numeric to be in kB units */
   static char STRING[8];
   if (val * kB < kB)
@@ -63,7 +63,6 @@ char *format_units(float val)
     sprintf(STRING, "%.1fM", val / kB);
   else if (val * kB > gB - 1)
     sprintf(STRING, "%.1fG", val / mB);
-
   return STRING;
 }
 
@@ -117,7 +116,7 @@ void input_event_node(char NODE[], const char TYPE[])
 const char *date(void)
 {
   time_t t = time(NULL);
-  strftime(TIME, sizeof TIME, "%l:%M %a %d%b", localtime(&t));
+  strftime(TIME, sizeof TIME, "%l%M %a %d%b", localtime(&t));
   return TIME;
 }
 
@@ -221,11 +220,6 @@ static void init_snd(asound_cards_t *asound_cards)
   read_dir(asound_cards, init_snd_cb, SOUND);
 }
 
-bool ac(void)
-{
-  return ac_state;
-}
-
 static void battery_cb(void *data, const char STRING[])
 {
   batteries_t *batteries = data;
@@ -281,17 +275,17 @@ static void init_batteries(batteries_t *batteries)
 
 static void ac_cb(void *data, const char STRING[])
 {
-  bool *ac_state = data;
+  bool *ac_state = data = 0;
   if (!strcmp("state: on-line", STRING))
     *ac_state = 1;
-  else
-    *ac_online = 0;
 }
 
-void refresh_ps(void)
+bool ac(void)
 {
   read_file(&ac_state, ac_cb, ACPI_ACSTATE);
+  return ac_state;
 }
+
 #else
 static void battery_state_cb(void *data, const char STRING[])
 {
@@ -324,10 +318,12 @@ static void ac_cb(void *data, const char STRING[])
   *ac_state = !val;
 }
 
-void refresh_ps(void)
+bool ac(void)
 {
   read_file(&ac_state, ac_cb, SYS_ACSTATE);
+  return ac_state;
 }
+
 #endif
 char battery_state(unsigned i)
 {
@@ -344,7 +340,7 @@ const char *battery_string(unsigned i)
   return batteries.battery[i].BAT;
 }
 
-void refresh_battery(unsigned i)
+void read_battery(unsigned i)
 {
   read_file(&batteries.battery[i], battery_state_cb, batteries.battery[i].STATEFILE);
 }
@@ -354,13 +350,13 @@ unsigned batteries_size(void)
   return batteries.size;
 }
 
-void refresh_batteries(void)
+void read_batteries(void)
 {
   unsigned perc = 0;
   char state = 'F';
   for (unsigned i = 0; i < batteries_size(); i++)
   {
-    refresh_battery(i);
+    read_battery(i);
     perc += battery_perc(i);
     if (battery_state(i) == 'D')
       state = battery_state(i);
@@ -468,7 +464,7 @@ static void net_cb(void *data, const char LINE[])
   }
 }
 
-void refresh_netadapter(unsigned i)
+void read_netadapter(unsigned i)
 {
   read_file(&NET[i], net_cb, NET_ADAPTERS);
 }
@@ -546,7 +542,7 @@ unsigned read_kbps(unsigned i, unsigned interval)
   return (diskstats->rd_sec_or_wr_ios - diskstats->prev_rd_sec_or_wr_ios) / 2. / interval;
 }
 
-void refresh_diskstats(unsigned i)
+void read_diskstats(unsigned i)
 {
   diskstats_t *diskstats = &DISKSTATS[i];
   read_file(diskstats, blkdev_cb, DISKSTAT);
