@@ -1,0 +1,3 @@
+#! /bin/sh
+
+(/usr/local/bin/status | while read LINE; do "$(echo $LINE > /tmp/status & xsetroot -name "$(echo $LINE)")"; done)
