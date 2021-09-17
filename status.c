@@ -115,8 +115,16 @@ void input_event_node(char NODE[], const char TYPE[])
 
 const char *date(void)
 {
-  time_t t = time(NULL);
-  strftime(TIME, sizeof TIME, "%l%M %a %d%b", localtime(&t));
+  time_t t;
+  time(&t);
+  struct tm *info = localtime(&t);
+  char hour[4], min[4], weekday[4], day[4];
+  strftime(hour, sizeof hour, "%I", info);
+  unsigned char h = atoi(hour);
+  strftime(min, sizeof min, "%M", info);
+  strftime(weekday, sizeof weekday, "%a", info);
+  strftime(day, sizeof day, "%d", info);
+  sprintf(TIME, "%d%s %.2s%s", h, min, weekday, day);
   return TIME;
 }
 

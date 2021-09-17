@@ -33,3 +33,6 @@
 	"http://checkip.amazonaws.com",\
 	"http://ipinfo.io/ip",\
 	"http://ipecho.net/plain",
+#define BAT_THRESHOLD_VAL       5
+#define BAT_THRESHOLD_SPAWN     "yyy"
+#define BAT_THRESHOLD_SPAWN_ARG "D"

@@ -6,7 +6,7 @@ OBJ_STATUSLIB = ${SRC_STATUSLIB:.c=.o}
 SRC_STATUSCLI = status_cli.c
 OBJ_STATUSCLI = ${SRC_STATUSCLI:.c=.o}
 
-CC      = gcc
+CC      = cc
 CFLAGS  = -c -Wall -Wextra -Werror -pie -fPIC -O3 ${INCS}
 LDFLAGS = ${LIBS}
 

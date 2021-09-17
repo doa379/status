@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
     fprintf(stdout, "%s%.0f%% (%s)", DELIM, mem_perc(), fmt_units(mem_swap()));
     for (unsigned i = 0; i < LENGTH(BLKDEV); i++)
     {
-      fprintf(stdout, "%s%s ", DELIM, BLKDEV[i]);
+      fprintf(stdout, "%s%s", DELIM, BLKDEV[i]);
       /**/
       read_diskstats(i);
       fprintf(stdout, "%s%s", UP, fmt_units(read_kbps(i, interval)));
@@ -44,13 +44,13 @@ int main(int argc, char *argv[])
     
     fprintf(stdout, "%s", DELIM);
     for (unsigned i = 0; i < LENGTH(DIRECTORY); i++)
-      fprintf(stdout, "%s %u%% ", DIRECTORY[i], du_perc(DIRECTORY[i]));
+      fprintf(stdout, "%s %u%%", DIRECTORY[i], du_perc(DIRECTORY[i]));
 
     for (unsigned i = 0; i < LENGTH(NETIF); i++)
     {
       fprintf(stdout, "%s", DELIM);
       if (ssid(i))
-        fprintf(stdout, "%.5s..%d%% ", ssid_string(i), wireless_link(i));
+        fprintf(stdout, "%.5s..%d%%", ssid_string(i), wireless_link(i));
       else
         fprintf(stdout, "%s ", NETIF[i]);
 
@@ -66,6 +66,12 @@ int main(int argc, char *argv[])
     /**/
     read_batteries();
     fprintf(stdout, "%s%s %d%% %c", DELIM, BATSYM, batteries_perc(), batteries_state());
+    if (batteries_perc() < BAT_THRESHOLD_VAL && fork() == 0)
+    {
+      char *args[] = { BAT_THRESHOLD_SPAWN, BAT_THRESHOLD_SPAWN_ARG, NULL };
+      execvp(BAT_THRESHOLD_SPAWN, args);
+      sleep(2);
+    }
     for (unsigned i = 0; i < asound_cards_size(); i++)
       if (asound_card_p(i)[0] != '\0' || asound_card_c(i)[0] != '\0')
         fprintf(stdout, "%s%s%s", 
