@@ -361,30 +361,18 @@ unsigned batteries_size(void)
 void read_batteries(void)
 {
   unsigned perc = 0;
-  char state = 'F';
+  batteries.state = 0;
   for (unsigned i = 0; i < batteries_size(); i++)
   {
     read_battery(i);
     perc += battery_perc(i);
     if (battery_state(i) == 'D')
-      state = battery_state(i);
+      batteries.state = 'D';
+    else if (battery_state(i) == 'C')
+      batteries.state = 'C';
   }
 
   batteries.perc = perc / batteries_size();
-  if (state != 'D')
-  {
-  	for (unsigned i = 0; i < batteries_size(); i++)
-    	if (battery_state(i) == 'C')
-      	state = battery_state(i);
-  }
-  if (state != 'D' || state != 'C')
-  {
-  	for (unsigned i = 0; i < batteries_size(); i++)
-    	if (battery_state(i) == 'U')
-      	state = battery_state(i);
-  }
- 
-  batteries.state = state;
 }
 
 char batteries_state(void)
@@ -668,7 +656,7 @@ static void init_curl(ip_t *ip)
   curl_easy_setopt(ip->handle, CURLOPT_URL, IPURL[0]);
   curl_easy_setopt(ip->handle, CURLOPT_WRITEFUNCTION, writefunc);
   curl_easy_setopt(ip->handle, CURLOPT_WRITEDATA, ip);
-  curl_easy_setopt(ip->handle, CURLOPT_TIMEOUT_MS, 250L);
+  curl_easy_setopt(ip->handle, CURLOPT_TIMEOUT, 2L);
 }
 
 static void deinit_ip(ip_t *ip)

@@ -33,18 +33,20 @@ int main(int argc, char *argv[])
     fprintf(stdout, "%s%dW", PWRSYM, power(interval));
     fprintf(stdout, "%s%.0lf%% %.0fMHz", DELIM, cpu_perc(), cpu_mhz());
     fprintf(stdout, "%s%.0f%% (%s)", DELIM, mem_perc(), fmt_units(mem_swap()));
+    fprintf(stdout, "%s", DELIM);
     for (unsigned i = 0; i < LENGTH(BLKDEV); i++)
     {
-      fprintf(stdout, "%s%s", DELIM, BLKDEV[i]);
+      fprintf(stdout, "%s", BLKDEV[i]);
       /**/
       read_diskstats(i);
       fprintf(stdout, "%s%s", UP, fmt_units(read_kbps(i, interval)));
-      fprintf(stdout, "%s%s", DOWN, fmt_units(write_kbps(i, interval)));
+      fprintf(stdout, "%s%s ", DOWN, fmt_units(write_kbps(i, interval)));
     }
     
-    fprintf(stdout, "%s", DELIM);
+    fprintf(stdout, "%c%s", '\b', DELIM);
     for (unsigned i = 0; i < LENGTH(DIRECTORY); i++)
-      fprintf(stdout, "%s %u%%", DIRECTORY[i], du_perc(DIRECTORY[i]));
+      fprintf(stdout, "%s %u%% ", DIRECTORY[i], du_perc(DIRECTORY[i]));
+    fprintf(stdout, "%c", '\b');
 
     for (unsigned i = 0; i < LENGTH(NETIF); i++)
     {
@@ -65,7 +67,8 @@ int main(int argc, char *argv[])
     fprintf(stdout, "%s%s", DELIM, public_ip());
     /**/
     read_batteries();
-    fprintf(stdout, "%s%s %d%% %c", DELIM, BATSYM, batteries_perc(), batteries_state());
+    fprintf(stdout, "%s%s %d%% %c", 
+      DELIM, BATSYM, batteries_perc(), batteries_state() ? batteries_state() : '\b');
     if (batteries_perc() < BAT_THRESHOLD_VAL && fork() == 0)
     {
       char *args[] = { BAT_THRESHOLD_SPAWN, BAT_THRESHOLD_SPAWN_ARG, NULL };
