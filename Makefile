@@ -1,13 +1,15 @@
-INCS    =
-LIBS    = -l curl
+INCS    = -I ..
+LIBS    = -l sock
 
 SRC_STATUSLIB = status.c
 OBJ_STATUSLIB = ${SRC_STATUSLIB:.c=.o}
 SRC_STATUSCLI = status_cli.c
 OBJ_STATUSCLI = ${SRC_STATUSCLI:.c=.o}
 
-CC      = cc
-CFLAGS  = -c -Wall -Wextra -Werror -pie -fPIC -O3 ${INCS}
+CC      = clang
+REL_CFLAGS  = -c -Wall -Wextra -Werror -fPIE -fPIC -O3 ${INCS}
+DEB_CFLAGS  = -g -c -Wall -Wextra -Werror -fPIE -fPIC ${INCS}
+CFLAGS  = ${REL_CFLAGS}
 LDFLAGS = ${LIBS}
 
 all: libstatus.so status

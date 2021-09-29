@@ -28,11 +28,10 @@
 #define BLKDEVS                 "sda"
 #define DIRECTORIES             "/", "/tmp"
 #define NETIFS                  "wlan0",
-#define IPURLS                  \
-	"http://whatismyip.akamai.com",\
-	"http://checkip.amazonaws.com",\
-	"http://ipinfo.io/ip",\
-	"http://ipecho.net/plain",
 #define BAT_THRESHOLD_VAL       5
 #define BAT_THRESHOLD_SPAWN     "yyy"
 #define BAT_THRESHOLD_SPAWN_ARG "D"
+#define IPHOST0                 "whatismyip.akamai.com", "/"
+#define IPHOST1                 "checkip.amazonaws.com", "/"
+#define IPHOST2                 "ipinfo.io", "/ip"
+#define IPHOST3                 "ipecho.net", "/plain"

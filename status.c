@@ -8,18 +8,20 @@
 #include <sys/statvfs.h>
 #include <sys/ioctl.h>
 #include <stdlib.h>
-#include "status.h"
+#include <stdio.h>
+#include <time.h>
+#include <status/status.h>
 
 static const char *BLKDEV[] = { BLKDEVS };
 static const char *NETIF[] = { NETIFS };
-static const char *IPURL[] = { IPURLS };
+static const char *IPHOST[] = { IPHOST0 };
 static char LINE[STRLEN];
 static cpu_t cpu;
 static mem_t mem;
-static diskstats_t DISKSTATS[LENGTH(BLKDEV)];
-static net_t NET[LENGTH(NETIF)];
-static wireless_t WLAN[LENGTH(NETIF)];
-static ip_t ip;
+static diskstats_t DISKSTATS[LEN(BLKDEV)];
+static net_t NET[LEN(NETIF)];
+static wireless_t WLAN[LEN(NETIF)];
+static http_t http;
 static bool ac_state;
 static batteries_t batteries;
 static asound_cards_t asound_cards;
@@ -61,7 +63,7 @@ const char *fmt_units(float val)
     sprintf(STRING, "%.0fK", val);
   else if (val * kB > mB - 1 && val * kB < gB)
     sprintf(STRING, "%.1fM", val / kB);
-  else if (val * kB > gB - 1)
+  else if (val * kB > (float) gB - 1)
     sprintf(STRING, "%.1fG", val / mB);
   return STRING;
 }
@@ -387,10 +389,15 @@ unsigned batteries_perc(void)
 
 const char *public_ip(void)
 {
-  if (curl_easy_perform(ip.handle) != CURLE_OK ||
-    ip.BUFFER[0] == '\0')
-    strcpy(ip.BUFFER, "No IP");
-  return ip.BUFFER;
+  static char IP[48];
+  char HEAD[256] = { 0 };
+  if (!performreq(IP, HEAD, &http, IPHOST[1]))
+  {
+    strcpy(IP, "NoIP");
+    deinit(&http);
+    init(&http, IPHOST[0]);
+  }
+  return IP;
 }
 
 unsigned wireless_link(unsigned i)
@@ -427,20 +434,17 @@ bool ssid(unsigned i)
   if (strlen(ssid->SSID))
   {
     read_file(&WLAN[i], wireless_cb, WIRELESS);
-    return 1;
+    return true;
   }
 
-  return 0;
+  return false;
 }
 
 static bool init_ssid(ssid_t *ssid, const char NETIF[])
 {
   memset(&ssid->wreq, 0, sizeof ssid->wreq);
   strcpy(ssid->wreq.ifr_name, NETIF);
-  if ((ssid->sockfd = socket(AF_INET, SOCK_DGRAM, 0)) > -1)
-    return 1;
-
-  return 0;
+  return (ssid->sockfd = socket(AF_INET, SOCK_DGRAM, 0)) > -1;
 }
 
 static void net_cb(void *data, const char LINE[])
@@ -490,11 +494,11 @@ unsigned tx_kbps(unsigned i, unsigned interval)
 
 static void init_net(net_t NET[], wireless_t WLAN[])
 {
-  for (unsigned i = 0; i < LENGTH(NETIF); i++)
+  for (unsigned i = 0; i < LEN(NETIF); i++)
   {
     NET[i].netif = NETIF[i];
     WLAN[i].net = &NET[i];
-    while(!init_ssid(&WLAN[i].ssid, NETIF[i]));
+    init_ssid(&WLAN[i].ssid, NETIF[i]);
     read_file(&NET[i], net_cb, NET_ADAPTERS);
     read_file(&WLAN[i], wireless_cb, WIRELESS);
   }
@@ -546,7 +550,7 @@ void read_diskstats(unsigned i)
 
 static void init_diskstats(diskstats_t DISKSTATS[])
 {
-  for (unsigned i = 0; i < LENGTH(BLKDEV); i++)
+  for (unsigned i = 0; i < LEN(BLKDEV); i++)
   {
     DISKSTATS[i].blkdev = BLKDEV[i];
     read_file(&DISKSTATS[i], blkdev_cb, DISKSTAT);
@@ -628,45 +632,14 @@ float cpu_perc(void)
   return cpu.perc;
 }
 
-static size_t writefunc(void *ptr, size_t size, size_t nmemb, void *data)
+static void deinit_http(void)
 {
-  ip_t *ip = data;
-  size_t S = size * nmemb;
-  if (S < sizeof ip->BUFFER)
-  {
-    memset(ip->BUFFER, 0, S);
-    memcpy(ip->BUFFER, ptr, S);
-    ip->BUFFER[S] = '\0';
-  }
-  else 
-    ip->BUFFER[0] = '\0';
-
-  return S;
+  deinit(&http);
 }
 
-static void deinit_curl(ip_t *ip)
+static void init_http(void)
 {
-  curl_easy_cleanup(ip->handle);
-}
-
-static void init_curl(ip_t *ip)
-{
-  curl_global_init(CURL_GLOBAL_ALL);
-  ip->handle = curl_easy_init();
-  curl_easy_setopt(ip->handle, CURLOPT_URL, IPURL[0]);
-  curl_easy_setopt(ip->handle, CURLOPT_WRITEFUNCTION, writefunc);
-  curl_easy_setopt(ip->handle, CURLOPT_WRITEDATA, ip);
-  curl_easy_setopt(ip->handle, CURLOPT_TIMEOUT, 2L);
-}
-
-static void deinit_ip(ip_t *ip)
-{
-  deinit_curl(ip);
-}
-
-static void init_ip(ip_t *ip)
-{
-  init_curl(ip);
+  init(&http, IPHOST[0]);
 }
 
 void deinit_status(void)
@@ -674,7 +647,7 @@ void deinit_status(void)
   deinit_power(&powercaps);
   deinit_snd(&asound_cards);
   deinit_batteries(&batteries);
-  deinit_ip(&ip);
+  deinit_http();
 }
 
 void init_status(void)
@@ -683,7 +656,7 @@ void init_status(void)
   setbuf(stdout, NULL);
   init_diskstats(DISKSTATS);
   init_net(NET, WLAN);
-  init_ip(&ip);
+  init_http();
   init_batteries(&batteries);
   init_snd(&asound_cards);
   init_power(&powercaps);

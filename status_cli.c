@@ -26,6 +26,7 @@ int main(int argc, char *argv[])
   SA.sa_handler = set_quit_flag;
   sigaction(SIGINT,  &SA, NULL);
   sigaction(SIGTERM, &SA, NULL);
+  signal(SIGPIPE, SIG_IGN);
   init_status();
   while (!quit)
   {
@@ -34,29 +35,26 @@ int main(int argc, char *argv[])
     fprintf(stdout, "%s%.0lf%% %.0fMHz", DELIM, cpu_perc(), cpu_mhz());
     fprintf(stdout, "%s%.0f%% (%s)", DELIM, mem_perc(), fmt_units(mem_swap()));
     fprintf(stdout, "%s", DELIM);
-    for (unsigned i = 0; i < LENGTH(BLKDEV); i++)
+    for (unsigned i = 0; i < LEN(BLKDEV); i++)
     {
       fprintf(stdout, "%s", BLKDEV[i]);
-      /**/
       read_diskstats(i);
       fprintf(stdout, "%s%s", UP, fmt_units(read_kbps(i, interval)));
       fprintf(stdout, "%s%s ", DOWN, fmt_units(write_kbps(i, interval)));
     }
     
-    fprintf(stdout, "%c%s", '\b', DELIM);
-    for (unsigned i = 0; i < LENGTH(DIRECTORY); i++)
+    fprintf(stdout, "%s", DELIM);
+    for (unsigned i = 0; i < LEN(DIRECTORY); i++)
       fprintf(stdout, "%s %u%% ", DIRECTORY[i], du_perc(DIRECTORY[i]));
-    fprintf(stdout, "%c", '\b');
 
-    for (unsigned i = 0; i < LENGTH(NETIF); i++)
+    for (unsigned i = 0; i < LEN(NETIF); i++)
     {
       fprintf(stdout, "%s", DELIM);
       if (ssid(i))
         fprintf(stdout, "%.5s..%d%%", ssid_string(i), wireless_link(i));
       else
-        fprintf(stdout, "%s ", NETIF[i]);
+        fprintf(stdout, "%s", NETIF[i]);
 
-      /**/
       read_netadapter(i);
       fprintf(stdout, "%s%s", UP, fmt_units(tx_kbps(i, interval)));
       fprintf(stdout, "(%s)", fmt_units(tx_total_kb(i)));
@@ -65,10 +63,10 @@ int main(int argc, char *argv[])
     }
 
     fprintf(stdout, "%s%s", DELIM, public_ip());
-    /**/
     read_batteries();
-    fprintf(stdout, "%s%s %d%% %c", 
-      DELIM, BATSYM, batteries_perc(), batteries_state() ? batteries_state() : '\b');
+    fprintf(stdout, "%s%s %d%%", DELIM, BATSYM, batteries_perc());
+    if (batteries_state())
+      fprintf(stdout, " %c", batteries_state());
     if (batteries_perc() < BAT_THRESHOLD_VAL && fork() == 0)
     {
       char *args[] = { BAT_THRESHOLD_SPAWN, BAT_THRESHOLD_SPAWN_ARG, NULL };

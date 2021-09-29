@@ -3,11 +3,11 @@
 
 #include <stdbool.h>
 #include <linux/wireless.h>
-#include <curl/curl.h>
 #include <stdarg.h>
-#include "config.h"
+#include <libsock/sock.h>
+#include <status/config.h>
 
-#define LENGTH(X)		(sizeof X / sizeof X[0])
+#define LEN(X)  (sizeof X / sizeof X[0])
 #define CPU	"/proc/cpuinfo"
 #define MEM	"/proc/meminfo"
 #define STAT "/proc/stat"
@@ -79,12 +79,6 @@ typedef struct
   ssid_t ssid;
   net_t *net;
 } wireless_t;
-
-typedef struct
-{
-  CURL *handle;
-  char BUFFER[64];
-} ip_t;
 
 typedef struct
 {
