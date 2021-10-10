@@ -21,7 +21,7 @@ static mem_t mem;
 static diskstats_t DISKSTATS[LEN(BLKDEV)];
 static net_t NET[LEN(NETIF)];
 static wireless_t WLAN[LEN(NETIF)];
-static http_t http;
+static tcp_t tcp;
 static bool ac_state;
 static batteries_t batteries;
 static asound_cards_t asound_cards;
@@ -391,11 +391,11 @@ const char *public_ip(void)
 {
   static char IP[48];
   char HEAD[256] = { 0 };
-  if (!performreq(IP, HEAD, &http, IPHOST[1]))
+  if (!performreq(IP, HEAD, &tcp, IPHOST[2]))
   {
     strcpy(IP, "NoIP");
-    deinit(&http);
-    init(&http, IPHOST[0]);
+    deinit(&tcp);
+    init(&tcp, IPHOST[1], IPHOST[0]);
   }
   return IP;
 }
@@ -632,14 +632,14 @@ float cpu_perc(void)
   return cpu.perc;
 }
 
-static void deinit_http(void)
+static void deinit_tcp(void)
 {
-  deinit(&http);
+  deinit(&tcp);
 }
 
-static void init_http(void)
+static void init_tcp(void)
 {
-  init(&http, IPHOST[0]);
+  init(&tcp, IPHOST[1], IPHOST[0]);
 }
 
 void deinit_status(void)
@@ -647,7 +647,7 @@ void deinit_status(void)
   deinit_power(&powercaps);
   deinit_snd(&asound_cards);
   deinit_batteries(&batteries);
-  deinit_http();
+  deinit_tcp();
 }
 
 void init_status(void)
@@ -656,7 +656,7 @@ void init_status(void)
   setbuf(stdout, NULL);
   init_diskstats(DISKSTATS);
   init_net(NET, WLAN);
-  init_http();
+  init_tcp();
   init_batteries(&batteries);
   init_snd(&asound_cards);
   init_power(&powercaps);

@@ -31,7 +31,7 @@
 #define BAT_THRESHOLD_VAL       5
 #define BAT_THRESHOLD_SPAWN     "yyy"
 #define BAT_THRESHOLD_SPAWN_ARG "D"
-#define IPHOST0                 "whatismyip.akamai.com", "/"
-#define IPHOST1                 "checkip.amazonaws.com", "/"
-#define IPHOST2                 "ipinfo.io", "/ip"
-#define IPHOST3                 "ipecho.net", "/plain"
+#define IPHOST0                 "http", "whatismyip.akamai.com", "/"
+#define IPHOST1                 "http", "checkip.amazonaws.com", "/"
+#define IPHOST2                 "http", "ipinfo.io", "/ip"
+#define IPHOST3                 "https", "ipecho.net", "/plain"
