@@ -391,7 +391,7 @@ const char *public_ip(void)
 {
   static char IP[48];
   char HEAD[256] = { 0 };
-  if (!performreq(IP, HEAD, &tcp, IPHOST[2]))
+  if (!performreq(IP, HEAD, &tcp, NULL, 0, IPHOST[2]))
   {
     strcpy(IP, "NoIP");
     deinit(&tcp);
