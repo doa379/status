@@ -1,4 +1,3 @@
-#define	STRLEN 1024
 /* Update interval in sec */
 #define UPDATE_INTV_ON_BATTERY 30
 #define UPDATE_INTV	5
@@ -24,11 +23,11 @@
 #define SNDSYM                  "\u266c"
 #define MICSYM                  "\u2706"
 #define BATSYM		              "B"
-#define DELIM		                "|"
+#define DELIM		                " "
 #define BLKDEVS                 "sda"
 #define DIRECTORIES             "/", "/tmp"
 #define NETIFS                  "wlan0",
-#define BAT_THRESHOLD_VAL       5
+#define BAT_THRESHOLD_VAL       10
 #define BAT_THRESHOLD_SPAWN     "yyy"
 #define BAT_THRESHOLD_SPAWN_ARG "D"
 #define IPHOST0                 "http", "whatismyip.akamai.com", "/"

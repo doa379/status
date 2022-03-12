@@ -25,8 +25,7 @@
 #define mB			(kB * kB)
 #define gB			(kB * mB)
 
-typedef struct
-{
+typedef struct {
   unsigned long user,
                 nice,
                 system,
@@ -38,8 +37,7 @@ typedef struct
   float perc, mhz;
 } cpu_t;
 
-typedef struct
-{
+typedef struct {
   unsigned long total,
                 free,
                 available,
@@ -51,37 +49,32 @@ typedef struct
   float perc, swap;
 } mem_t;
 
-typedef struct
-{
+typedef struct {
   char DEVNAME[16];
   unsigned long prev_rd_sec_or_wr_ios, prev_wr_sec, rd_sec_or_wr_ios, wr_sec;
   const char *blkdev;
 } diskstats_t;
 
-typedef struct
-{
+typedef struct {
   char IFNAME[8];
   unsigned long prev_RXbytes, prev_TXbytes, RXbytes, TXbytes;
   const char *netif;
 } net_t;
 
-typedef struct
-{
+typedef struct {
   char SSID[16];
   struct iwreq wreq;
   int sockfd;
 } ssid_t;
 
-typedef struct
-{
+typedef struct {
   char IFNAME[8];
   float link, level, noise;
   ssid_t ssid;
   net_t *net;
 } wireless_t;
 
-typedef struct
-{
+typedef struct {
   unsigned capacity,
            remaining,
            rate, 
@@ -89,41 +82,35 @@ typedef struct
   char BAT[8], STATEFILE[64], state;
 } battery_t;
 
-typedef struct
-{
+typedef struct {
   battery_t *battery;
   size_t size;
   unsigned perc;
   char state;
 } batteries_t;
 
-typedef struct
-{
+typedef struct {
   char STATEFILE[512];
   unsigned long energy_uj;
 } powercap_t;
 
-typedef struct
-{
+typedef struct {
   powercap_t *powercap;
   size_t size;
   unsigned long curr_energy_uj, prev_energy_uj;
 } powercaps_t;
 
-typedef struct
-{
+typedef struct {
   char P_STATEFILE[512], C_STATEFILE[512];
   char P_SND[16], C_SND[16];
 } asound_card_t;
 
-typedef struct
-{
+typedef struct {
   asound_card_t *card;
   size_t size;
 } asound_cards_t;
 
-typedef struct
-{
+typedef struct {
   char *node;
   const char *type;
   bool found;

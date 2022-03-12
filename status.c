@@ -15,7 +15,7 @@
 static const char *BLKDEV[] = { BLKDEVS };
 static const char *NETIF[] = { NETIFS };
 static const char *IPHOST[] = { IPHOST0 };
-static char LINE[STRLEN];
+static char LINE[1024];
 static cpu_t cpu;
 static mem_t mem;
 static diskstats_t DISKSTATS[LEN(BLKDEV)];
@@ -28,8 +28,7 @@ static asound_cards_t asound_cards;
 static char TIME[32];
 static powercaps_t powercaps;
 
-static void read_file(void *data, void (*cb)(), const char FILENAME[])
-{
+static void read_file(void *data, void (*cb)(), const char FILENAME[]) {
   FILE *fp = fopen(FILENAME, "r");
   if (!fp)
     return;
@@ -40,8 +39,7 @@ static void read_file(void *data, void (*cb)(), const char FILENAME[])
   fclose(fp);
 }
 
-static void read_dir(void *data, void (*cb)(), const char DIRNAME[])
-{
+static void read_dir(void *data, void (*cb)(), const char DIRNAME[]) {
   DIR *dp = opendir(DIRNAME);
   if (!dp)
     return;
@@ -54,8 +52,8 @@ static void read_dir(void *data, void (*cb)(), const char DIRNAME[])
   closedir(dp);
 }
 
-const char *fmt_units(float val)
-{ /* Function expects numeric to be in kB units */
+const char *fmt_units(float val) {
+  /* Function expects numeric to be in kB units */
   static char STRING[8];
   if (val * kB < kB)
     sprintf(STRING, "%.0fB", val * kB);
@@ -68,8 +66,7 @@ const char *fmt_units(float val)
   return STRING;
 }
 
-void tail(char LINE[], size_t size, const char FILENAME[], unsigned char n)
-{
+void tail(char LINE[], size_t size, const char FILENAME[], unsigned char n) {
   FILE *fp = fopen(FILENAME, "r");
   if (!fp)
     return;
@@ -89,17 +86,13 @@ void tail(char LINE[], size_t size, const char FILENAME[], unsigned char n)
   fclose(fp);
 }
 
-static void parse_dev_cb(void *data, char LINE[])
-{
+static void parse_dev_cb(void *data, char LINE[]) {
   device_t *device = data;
   if (!strncmp("N:", LINE, 2) && strstr(LINE, device->type))
     device->found = 1;
-
-  else if (!strncmp("H:", LINE, 2) && device->found)
-  {
+  else if (!strncmp("H:", LINE, 2) && device->found) {
     char *p;
-    if ((p = strstr(LINE, "event")))
-    {
+    if ((p = strstr(LINE, "event"))) {
       char EV[8];
       sscanf(p, "%s", EV);
       sprintf(device->node, "/dev/input/%s", EV);
@@ -109,14 +102,12 @@ static void parse_dev_cb(void *data, char LINE[])
   }
 }
 
-void input_event_node(char NODE[], const char TYPE[])
-{
+void input_event_node(char NODE[], const char TYPE[]) {
   device_t device = { NODE, TYPE, 0 };
   read_file(&device, parse_dev_cb, DEVICES);
 }
 
-const char *date(void)
-{
+const char *date(void) {
   time_t t;
   time(&t);
   struct tm *info = localtime(&t);
@@ -130,15 +121,13 @@ const char *date(void)
   return TIME;
 }
 
-static void energyuj_cb(void *data, const char LINE[])
-{
+static void energyuj_cb(void *data, const char LINE[]) {
   unsigned long energy, *total_energy = data;
   sscanf(LINE, "%lu", &energy);
   *total_energy += energy;
 }
 
-unsigned power(unsigned interval)
-{
+unsigned power(unsigned interval) {
   powercaps.prev_energy_uj = powercaps.curr_energy_uj;
   powercaps.curr_energy_uj = 0;
   for (unsigned i = 0; i < powercaps.size; i++)
@@ -147,15 +136,13 @@ unsigned power(unsigned interval)
   return (powercaps.curr_energy_uj - powercaps.prev_energy_uj) / 1e6 / interval;
 }
 
-static void init_powercap_cb(void *data, const char STRING[])
-{
+static void init_powercap_cb(void *data, const char STRING[]) {
   powercaps_t *powercaps = data;
   powercap_t powercap;
   char FILENAME[sizeof powercap.STATEFILE];
   sprintf(FILENAME, "%s/%s/energy_uj", ENERGY, STRING);
   FILE *fp = fopen(FILENAME, "r");
-  if (fp)
-  {
+  if (fp) {
     powercaps->powercap = realloc(powercaps->powercap, 
       (powercaps->size + 1) * sizeof powercap);
     strcpy(powercaps->powercap[powercaps->size].STATEFILE, FILENAME);
@@ -164,50 +151,42 @@ static void init_powercap_cb(void *data, const char STRING[])
   }
 }
 
-static void deinit_power(powercaps_t *powercaps)
-{
+static void deinit_power(powercaps_t *powercaps) {
   free(powercaps->powercap);
 }
 
-static void init_power(powercaps_t *powercaps)
-{
+static void init_power(powercaps_t *powercaps) {
   powercaps->powercap = malloc(1);
   powercaps->size = 0;
   read_dir(powercaps, init_powercap_cb, ENERGY);
 }
 
-static void snd_cb(void *data, const char LINE[])
-{
+static void snd_cb(void *data, const char LINE[]) {
   char *SND = data;
   unsigned pid;
   if (sscanf(LINE, "owner_pid  : %d", &pid))
     sprintf(SND, "%d", pid);
 }
 
-const char *asound_card_c(unsigned i)
-{
+const char *asound_card_c(unsigned i) {
   asound_cards.card[i].C_SND[0] = '\0';
   read_file(asound_cards.card[i].C_SND, snd_cb, asound_cards.card[i].C_STATEFILE);
   return asound_cards.card[i].C_SND;
 }
 
-const char *asound_card_p(unsigned i)
-{
+const char *asound_card_p(unsigned i) {
   asound_cards.card[i].P_SND[0] = '\0';
   read_file(asound_cards.card[i].P_SND, snd_cb, asound_cards.card[i].P_STATEFILE);
   return asound_cards.card[i].P_SND;
 }
 
-unsigned asound_cards_size(void)
-{
+unsigned asound_cards_size(void) {
   return asound_cards.size;
 }
 
-static void init_snd_cb(void *data, const char FILENAME[])
-{
+static void init_snd_cb(void *data, const char FILENAME[]) {
   asound_cards_t *asound_cards = data;
-  if (!strncmp(FILENAME, "card", 4) && strcmp(FILENAME, "cards"))
-  {
+  if (!strncmp(FILENAME, "card", 4) && strcmp(FILENAME, "cards")) {
     asound_cards->card = realloc(asound_cards->card, 
       (asound_cards->size + 1) * sizeof(asound_card_t));
     sprintf(asound_cards->card[asound_cards->size].P_STATEFILE, 
@@ -218,23 +197,19 @@ static void init_snd_cb(void *data, const char FILENAME[])
   }
 }
 
-static void deinit_snd(asound_cards_t *asound_cards)
-{
+static void deinit_snd(asound_cards_t *asound_cards) {
   free(asound_cards->card);
 }
 
-static void init_snd(asound_cards_t *asound_cards)
-{
+static void init_snd(asound_cards_t *asound_cards) {
   asound_cards->card = malloc(1);
   asound_cards->size = 0;
   read_dir(asound_cards, init_snd_cb, SOUND);
 }
 
-static void battery_cb(void *data, const char STRING[])
-{
+static void battery_cb(void *data, const char STRING[]) {
   batteries_t *batteries = data;
-  if (!strncmp("BAT", STRING, 3))
-  {
+  if (!strncmp("BAT", STRING, 3)) {
     batteries->battery = realloc(batteries->battery, 
       (batteries->size + 1) * sizeof(battery_t));
     strcpy(batteries->battery[batteries->size].BAT, STRING);
@@ -242,40 +217,34 @@ static void battery_cb(void *data, const char STRING[])
   }
 }
 
-static void deinit_batteries(batteries_t *batteries)
-{
+static void deinit_batteries(batteries_t *batteries) {
   free(batteries->battery);
 }
 
 #ifdef PROC_ACPI
-static void battery_state_cb(void *data, const char STRING[])
-{
+static void battery_state_cb(void *data, const char STRING[]) {
   battery_t *battery = data, tmp;
   if (sscanf(STRING, "charging state: %s", tmp.STATE))
     strcpy(battery->STATE, tmp.STATE);
   else if (sscanf(STRING, "present rate: %d", &tmp.rate))
     battery->rate = tmp.rate;
-  else if (sscanf(STRING, "remaining capacity: %d", &tmp.remaining))
-  {
+  else if (sscanf(STRING, "remaining capacity: %d", &tmp.remaining)) {
     battery->remaining = tmp.remaining;
     battery->perc = (float) battery->remaining / battery->capacity * 100;
   }
 }
 
-static void battery_info_cb(void *data, const char STRING[])
-{
+static void battery_info_cb(void *data, const char STRING[]) {
   battery_t *battery = data, tmp;
   if (sscanf(STRING, "design capacity: %d", &tmp.capacity))
     battery->capacity = tmp.capacity;
 }
 
-static void init_batteries(batteries_t *batteries)
-{
+static void init_batteries(batteries_t *batteries) {
   batteries->battery = malloc(1);
   batteries->size = 0;
   read_dir(batteries, battery_cb, ACPI_BAT);
-  for (unsigned i = 0; i < batteries->size; i++)
-  {
+  for (unsigned i = 0; i < batteries->size; i++) {
     char INFOFILE[32], *bat = batteries->battery[i].BAT;
     sprintf(INFOFILE, "%s/%s/info", ACPI_BAT, bat);
     read_file(&batteries->battery[i], battery_info_cb, INFOFILE);
@@ -283,22 +252,19 @@ static void init_batteries(batteries_t *batteries)
   }
 }
 
-static void ac_cb(void *data, const char STRING[])
-{
+static void ac_cb(void *data, const char STRING[]) {
   bool *ac_state = data = 0;
   if (!strcmp("state: on-line", STRING))
     *ac_state = 1;
 }
 
-bool ac(void)
-{
+bool ac(void) {
   read_file(&ac_state, ac_cb, ACPI_ACSTATE);
   return ac_state;
 }
 
 #else
-static void battery_state_cb(void *data, const char STRING[])
-{
+static void battery_state_cb(void *data, const char STRING[]) {
   battery_t *battery = data, tmp;
   if (sscanf(STRING, "POWER_SUPPLY_STATUS=%c", &tmp.state))
     battery->state = tmp.state > 96 ? tmp.state - 32 : tmp.state;
@@ -308,64 +274,53 @@ static void battery_state_cb(void *data, const char STRING[])
     battery->perc = tmp.perc;
 }
 
-static void init_batteries(batteries_t *batteries)
-{
+static void init_batteries(batteries_t *batteries) {
   batteries->battery = malloc(1);
   batteries->size = 0;
   read_dir(batteries, battery_cb, SYS_PS); 
-  for (unsigned i = 0; i < batteries->size; i++)
-  {
+  for (unsigned i = 0; i < batteries->size; i++) {
     char *bat = batteries->battery[i].BAT;
     sprintf(batteries->battery[i].STATEFILE, "%s/%s/uevent", SYS_PS, bat);
   }
 }
 
-static void ac_cb(void *data, const char STRING[])
-{
+static void ac_cb(void *data, const char STRING[]) {
   bool *ac_state = data;
   unsigned val;
   sscanf(STRING, "%ud", &val);
   *ac_state = !val;
 }
 
-bool ac(void)
-{
+bool ac(void) {
   read_file(&ac_state, ac_cb, SYS_ACSTATE);
   return ac_state;
 }
 
 #endif
-char battery_state(unsigned i)
-{
+char battery_state(unsigned i) {
   return batteries.battery[i].state;
 }
 
-unsigned battery_perc(unsigned i)
-{
+unsigned battery_perc(unsigned i) {
   return batteries.battery[i].perc;
 }
 
-const char *battery_string(unsigned i)
-{
+const char *battery_string(unsigned i) {
   return batteries.battery[i].BAT;
 }
 
-void read_battery(unsigned i)
-{
+void read_battery(unsigned i) {
   read_file(&batteries.battery[i], battery_state_cb, batteries.battery[i].STATEFILE);
 }
 
-unsigned batteries_size(void)
-{
+unsigned batteries_size(void) {
   return batteries.size;
 }
 
-void read_batteries(void)
-{
-  unsigned perc = 0;
+void read_batteries(void) {
+  float perc = 0;
   batteries.state = 0;
-  for (unsigned i = 0; i < batteries_size(); i++)
-  {
+  for (unsigned i = 0; i < batteries_size(); i++) {
     read_battery(i);
     perc += battery_perc(i);
     if (battery_state(i) == 'D')
@@ -377,62 +332,59 @@ void read_batteries(void)
   batteries.perc = perc / batteries_size();
 }
 
-char batteries_state(void)
-{
+char batteries_state(void) {
   return batteries.state;
 }
 
-unsigned batteries_perc(void)
-{
+unsigned batteries_perc(void) {
   return batteries.perc;
 }
 
-const char *public_ip(void)
-{
-  static char IP[48];
-  char HEAD[256] = { 0 };
-  if (!performreq(IP, HEAD, &tcp, NULL, 0, IPHOST[2]))
-  {
+const char *public_ip(void) {
+  static char IP[4096];
+  char HEAD[4096] = { 0 };
+  if (!performreq(IP, HEAD, &tcp, NULL, 0, IPHOST[2])) {
     strcpy(IP, "NoIP");
     deinit(&tcp);
     init(&tcp, IPHOST[1], IPHOST[0]);
   }
+
+  for (unsigned i = 0; i < sizeof IP; i++)
+    if (IP[i] == '\n') {
+      IP[i] = '\0';
+      break;
+    }
+
   return IP;
 }
 
-unsigned wireless_link(unsigned i)
-{
+unsigned wireless_link(unsigned i) {
   wireless_t *wireless = &WLAN[i];
   return wireless->link / 70. * 100;
 }
 
-const char *ssid_string(unsigned i)
-{
+const char *ssid_string(unsigned i) {
   ssid_t *ssid = &WLAN[i].ssid;
   return ssid->SSID;
 }
 
-static void wireless_cb(void *data, const char LINE[])
-{
+static void wireless_cb(void *data, const char LINE[]) {
   wireless_t *wireless = data, tmp;
   sscanf(LINE, "%s %*[^ ] %f %f %f", tmp.IFNAME, &tmp.link, &tmp.level, &tmp.noise);
-  if (strncmp(tmp.IFNAME, wireless->net->netif, strlen(wireless->net->netif)) == 0)
-  {
+  if (strncmp(tmp.IFNAME, wireless->net->netif, strlen(wireless->net->netif)) == 0) {
     wireless->link = tmp.link;
     wireless->level = tmp.level;
     wireless->noise = tmp.noise;
   }
 }
 
-bool ssid(unsigned i)
-{
+bool ssid(unsigned i) {
   ssid_t *ssid = &WLAN[i].ssid;
   memset(ssid->SSID, 0, sizeof ssid->SSID);
   ssid->wreq.u.essid.pointer = ssid->SSID;
   ssid->wreq.u.essid.length = sizeof ssid->SSID;
   ioctl(ssid->sockfd, SIOCGIWESSID, &ssid->wreq);
-  if (strlen(ssid->SSID))
-  {
+  if (strlen(ssid->SSID)) {
     read_file(&WLAN[i], wireless_cb, WIRELESS);
     return true;
   }
@@ -440,23 +392,20 @@ bool ssid(unsigned i)
   return false;
 }
 
-static bool init_ssid(ssid_t *ssid, const char NETIF[])
-{
+static bool init_ssid(ssid_t *ssid, const char NETIF[]) {
   memset(&ssid->wreq, 0, sizeof ssid->wreq);
   strcpy(ssid->wreq.ifr_name, NETIF);
   return (ssid->sockfd = socket(AF_INET, SOCK_DGRAM, 0)) > -1;
 }
 
-static void net_cb(void *data, const char LINE[])
-{
+static void net_cb(void *data, const char LINE[]) {
   net_t *net = data, tmp;
   sscanf(LINE, "%s %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ] %*[^ ]",
       tmp.IFNAME,
       &tmp.RXbytes,
       &tmp.TXbytes);
 
-  if (strncmp(tmp.IFNAME, net->netif, strlen(net->netif)) == 0)
-  {
+  if (strncmp(tmp.IFNAME, net->netif, strlen(net->netif)) == 0) {
     net->prev_RXbytes = net->RXbytes;
     net->prev_TXbytes = net->TXbytes;
     net->RXbytes = tmp.RXbytes;
@@ -464,38 +413,32 @@ static void net_cb(void *data, const char LINE[])
   }
 }
 
-void read_netadapter(unsigned i)
-{
+void read_netadapter(unsigned i) {
   read_file(&NET[i], net_cb, NET_ADAPTERS);
 }
 
-unsigned rx_total_kb(unsigned i)
-{
+unsigned rx_total_kb(unsigned i) {
   net_t *net = &NET[i];
   return net->RXbytes / kB;
 }
 
-unsigned tx_total_kb(unsigned i)
-{
+unsigned tx_total_kb(unsigned i) {
   net_t *net = &NET[i];
   return net->TXbytes / kB;
 }
 
-unsigned rx_kbps(unsigned i, unsigned interval)
-{
+unsigned rx_kbps(unsigned i, unsigned interval) {
   net_t *net = &NET[i];
   return (net->RXbytes - net->prev_RXbytes) / kB / interval;
 }
-unsigned tx_kbps(unsigned i, unsigned interval)
-{
+
+unsigned tx_kbps(unsigned i, unsigned interval) {
   net_t *net = &NET[i];
   return (net->TXbytes - net->prev_TXbytes) / kB / interval;
 }
 
-static void init_net(net_t NET[], wireless_t WLAN[])
-{
-  for (unsigned i = 0; i < LEN(NETIF); i++)
-  {
+static void init_net(net_t NET[], wireless_t WLAN[]) {
+  for (unsigned i = 0; i < LEN(NETIF); i++) {
     NET[i].netif = NETIF[i];
     WLAN[i].net = &NET[i];
     init_ssid(&WLAN[i].ssid, NETIF[i]);
@@ -504,8 +447,7 @@ static void init_net(net_t NET[], wireless_t WLAN[])
   }
 }
 
-unsigned du_perc(const char DIRECTORY[])
-{
+unsigned du_perc(const char DIRECTORY[]) {
   struct statvfs fs;
   if (statvfs(DIRECTORY, &fs) < 0)
     return 0;
@@ -513,16 +455,14 @@ unsigned du_perc(const char DIRECTORY[])
   return (1 - ((float) fs.f_bfree / (float) fs.f_blocks)) * 100;
 }
 
-static void blkdev_cb(void *data, const char LINE[])
-{
+static void blkdev_cb(void *data, const char LINE[]) {
   diskstats_t *diskstats = data, tmp;
   sscanf(LINE, " %*[^ ] %*[^ ] %s %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %lu %*[^ ] %*[^ ] %*[^ ] %*[^ ]",
       tmp.DEVNAME,
       &tmp.rd_sec_or_wr_ios,
       &tmp.wr_sec);
 
-  if (strcmp(tmp.DEVNAME, diskstats->blkdev) == 0)
-  {
+  if (strcmp(tmp.DEVNAME, diskstats->blkdev) == 0) {
     diskstats->prev_rd_sec_or_wr_ios = diskstats->rd_sec_or_wr_ios;
     diskstats->prev_wr_sec = diskstats->wr_sec;
     diskstats->rd_sec_or_wr_ios = tmp.rd_sec_or_wr_ios;
@@ -530,35 +470,29 @@ static void blkdev_cb(void *data, const char LINE[])
   }
 }
 
-unsigned write_kbps(unsigned i, unsigned interval)
-{
+unsigned write_kbps(unsigned i, unsigned interval) {
   diskstats_t *diskstats = &DISKSTATS[i];
   return (diskstats->wr_sec - diskstats->prev_wr_sec) / 2. / interval;
 }
 
-unsigned read_kbps(unsigned i, unsigned interval)
-{
+unsigned read_kbps(unsigned i, unsigned interval) {
   diskstats_t *diskstats = &DISKSTATS[i];
   return (diskstats->rd_sec_or_wr_ios - diskstats->prev_rd_sec_or_wr_ios) / 2. / interval;
 }
 
-void read_diskstats(unsigned i)
-{
+void read_diskstats(unsigned i) {
   diskstats_t *diskstats = &DISKSTATS[i];
   read_file(diskstats, blkdev_cb, DISKSTAT);
 }
 
-static void init_diskstats(diskstats_t DISKSTATS[])
-{
-  for (unsigned i = 0; i < LEN(BLKDEV); i++)
-  {
+static void init_diskstats(diskstats_t DISKSTATS[]) {
+  for (unsigned i = 0; i < LEN(BLKDEV); i++) {
     DISKSTATS[i].blkdev = BLKDEV[i];
     read_file(&DISKSTATS[i], blkdev_cb, DISKSTAT);
   }
 }
 
-static void mem_cb(void *data, const char LINE[])
-{
+static void mem_cb(void *data, const char LINE[]) {
   mem_t *mem = data;
   sscanf(LINE, "MemTotal: %lu", &mem->total);
   sscanf(LINE, "MemFree: %lu", &mem->free);
@@ -572,19 +506,16 @@ static void mem_cb(void *data, const char LINE[])
   mem->swap = mem->swaptotal - mem->swapfree - mem->swapcached;
 }
 
-float mem_swap(void)
-{
+float mem_swap(void) {
   return mem.swap;
 }
 
-float mem_perc(void)
-{
+float mem_perc(void) {
   read_file(&mem, mem_cb, MEM);
   return mem.perc;
 }
 
-static void cpustat_cb(void *data, const char LINE[])
-{
+static void cpustat_cb(void *data, const char LINE[]) {
   cpu_t *cpu = data, tmp;
   if (sscanf(LINE, "cpu%*[^0-9] %lu %lu %lu %lu %lu %lu %lu",
         &tmp.user,
@@ -593,8 +524,7 @@ static void cpustat_cb(void *data, const char LINE[])
         &tmp.idle,
         &tmp.iowait,
         &tmp.irq,
-        &tmp.softirq) == 7)
-  {
+        &tmp.softirq) == 7) {
     cpu->perc = (double) (tmp.user + tmp.nice + tmp.system + tmp.irq + tmp.softirq
         - cpu->user - cpu->nice - cpu->system - cpu->irq - cpu->softirq) /
       (double) (tmp.user + tmp.nice + tmp.system + tmp.idle + tmp.iowait + tmp.irq + tmp.softirq
@@ -610,8 +540,7 @@ static void cpustat_cb(void *data, const char LINE[])
   }
 }
 
-static void cpuinfo_cb(void *data, const char LINE[])
-{
+static void cpuinfo_cb(void *data, const char LINE[]) {
   cpu_t *cpu = data, tmp;
   if (sscanf(LINE, "processor : %ud", &tmp.processor) == 1)
     cpu->processor = tmp.processor;
@@ -620,38 +549,32 @@ static void cpuinfo_cb(void *data, const char LINE[])
     cpu->mhz = (cpu->mhz * (cpu->processor) + tmp.mhz) / (cpu->processor + 1);
 }
 
-float cpu_mhz(void)
-{
+float cpu_mhz(void) {
   read_file(&cpu, cpuinfo_cb, CPU);
   return cpu.mhz;
 }
 
-float cpu_perc(void)
-{
+float cpu_perc(void) {
   read_file(&cpu, cpustat_cb, STAT);
   return cpu.perc;
 }
 
-static void deinit_tcp(void)
-{
+static void deinit_tcp(void) {
   deinit(&tcp);
 }
 
-static void init_tcp(void)
-{
+static void init_tcp(void) {
   init(&tcp, IPHOST[1], IPHOST[0]);
 }
 
-void deinit_status(void)
-{
+void deinit_status(void) {
   deinit_power(&powercaps);
   deinit_snd(&asound_cards);
   deinit_batteries(&batteries);
   deinit_tcp();
 }
 
-void init_status(void)
-{
+void init_status(void) {
   setlocale(LC_ALL, "");
   setbuf(stdout, NULL);
   init_diskstats(DISKSTATS);
@@ -662,8 +585,7 @@ void init_status(void)
   init_power(&powercaps);
 }
 
-void print(char RESULT[], const char *format, ...)
-{
+void print(char RESULT[], const char *format, ...) {
   va_list args = { 0 };
   char STRING[64];
   va_start(args, format);
