@@ -23,6 +23,7 @@
 #define SNDSYM                  "\u266c"
 #define MICSYM                  "\u2706"
 #define BATSYM		              "B"
+#define SWAPSYM		              "S"
 #define DELIM		                " "
 #define BLKDEVS                 "sda"
 #define DIRECTORIES             "/", "/tmp"

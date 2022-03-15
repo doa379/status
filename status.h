@@ -134,7 +134,7 @@ void read_batteries(void);
 char batteries_state(void);
 unsigned batteries_perc(void);
 const char *public_ip();
-unsigned wireless_link(unsigned);
+unsigned char wireless_link(unsigned);
 const char *ssid_string(unsigned);
 bool ssid(unsigned);
 void read_netadapter(unsigned);

@@ -358,7 +358,7 @@ const char *public_ip(void) {
   return IP;
 }
 
-unsigned wireless_link(unsigned i) {
+unsigned char wireless_link(unsigned i) {
   wireless_t *wireless = &WLAN[i];
   return wireless->link / 70. * 100;
 }

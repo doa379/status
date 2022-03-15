@@ -14,7 +14,7 @@ DBG_CFLAGS  = -g -O0
 DBG_LDFLAGS =
 
 CFLAGS  = $(REL_CFLAGS)
-LDFLAGS = $(REL_LDFLAGS)
+LDFLAGS = $(RELLDFLAGS)
 
 ifeq ($(DEBUG), 1)
   CFLAGS  = $(DBG_CFLAGS)
@@ -29,7 +29,7 @@ all: libstatus.so status
 
 libstatus.so:	$(OBJ_STATUSLIB)
 	@echo CC -o $@
-	@$(CC) -shared -o $@ $(OBJ_STATUSLIB) $(LDFLAGS) $(LIBS)
+	@$(CC) -shared $(OBJ_STATUSLIB) $(LDFLAGS) $(LIBS) -o $@
 
 status:	$(OBJ_STATUSCLI)
 	@echo CC -o $@
